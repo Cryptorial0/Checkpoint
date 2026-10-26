@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -1956,23 +1957,35 @@ func scanAppDataEmulators(appData string, games *[]DetectedGame, seen map[string
 		}
 	}
 
-	// Yuzu / Suyu (Switch)
-	for _, yuzuName := range []string{"yuzu", "suyu"} {
-		yuzuSave := filepath.Join(appData, yuzuName, "nand", "user", "save")
-		if stat, err := os.Stat(yuzuSave); err == nil && stat.IsDir() && !seen[yuzuSave] {
-			count, size := getDirStats(yuzuSave)
-			if count > 0 {
-				seen[yuzuSave] = true
-				*games = append(*games, DetectedGame{
-					ID:                 "emu_" + yuzuName,
-					Name:               fmt.Sprintf("Nintendo Switch Saves (%s)", strings.Title(yuzuName)),
-					SaveType:           SaveTypeInTree,
-					StorageType:          "Switch Emulator",
-					SourcePath:         yuzuSave,
-					TargetRelativePath: yuzuName + "/nand/user/save",
-					FileCount:          count,
-					SizeBytes:          size,
-				})
+	// Switch Emulators (Ryujinx, Yuzu, Suyu, Eden, Sudachi, Torzu, Citron)
+	switchEmus := []string{"yuzu", "suyu", "eden", "sudachi", "torzu", "citron"}
+	localAppData := os.Getenv("LOCALAPPDATA")
+
+	for _, emuName := range switchEmus {
+		candidates := []string{
+			filepath.Join(appData, emuName, "nand", "user", "save"),
+		}
+		if localAppData != "" {
+			candidates = append(candidates, filepath.Join(localAppData, emuName, "nand", "user", "save"))
+		}
+		for _, emuSave := range candidates {
+			canonical := strings.ToLower(filepath.Clean(emuSave))
+			if stat, err := os.Stat(emuSave); err == nil && stat.IsDir() && !seen[canonical] && !seen[emuSave] {
+				count, size := getDirStats(emuSave)
+				if count > 0 {
+					seen[canonical] = true
+					seen[emuSave] = true
+					*games = append(*games, DetectedGame{
+						ID:                 "emu_" + emuName,
+						Name:               fmt.Sprintf("Nintendo Switch Saves (%s)", strings.Title(emuName)),
+						SaveType:           SaveTypeInTree,
+						StorageType:          "Switch Emulator",
+						SourcePath:         emuSave,
+						TargetRelativePath: emuName + "/nand/user/save",
+						FileCount:          count,
+						SizeBytes:          size,
+					})
+				}
 			}
 		}
 	}
@@ -2044,11 +2057,13 @@ func scanAppDataEmulators(appData string, games *[]DetectedGame, seen map[string
 	cemuRoaming := filepath.Join(appData, "Cemu", "mlc01", "usr", "save")
 	scanCemuSaves(cemuRoaming, "cemu/mlc01/usr/save", games, seen)
 
-	localAppData := os.Getenv("LOCALAPPDATA")
 	if localAppData != "" {
 		cemuLocal := filepath.Join(localAppData, "Cemu", "mlc01", "usr", "save")
 		scanCemuSaves(cemuLocal, "cemu/mlc01/usr/save", games, seen)
 	}
+
+	// ShadPS4 (PlayStation 4) in AppData Roaming and LocalAppData
+	scanShadPS4Locations(appData, localAppData, games, seen)
 }
 
 func parseCemuTitleName(metaXMLPath string) string {
@@ -2829,21 +2844,181 @@ func hasGameSaveIndicators(dir string) bool {
 
 var ps4TitleMap = map[string]string{
 	"CUSA00207": "Bloodborne",
+	"CUSA00900": "Bloodborne",
+	"CUSA01363": "Bloodborne",
 	"CUSA03173": "Bloodborne: The Old Hunters",
+	"CUSA03174": "Bloodborne: The Old Hunters",
+	"CUSA03014": "Bloodborne: The Old Hunters",
 	"CUSA01715": "God of War III Remastered",
+	"CUSA01716": "God of War III Remastered",
 	"CUSA00080": "DriveClub",
+	"CUSA00008": "DriveClub",
 	"CUSA00419": "Infamous Second Son",
+	"CUSA00434": "Infamous Second Son",
+	"CUSA00438": "Infamous Second Son",
+	"CUSA00439": "Infamous Second Son",
 	"CUSA00552": "The Last of Us Remastered",
+	"CUSA00556": "The Last of Us Remastered",
 	"CUSA00557": "God of War III Remastered",
+	"CUSA00558": "The Last of Us Remastered",
+	"CUSA00559": "The Last of Us Remastered",
 	"CUSA07408": "God of War",
+	"CUSA07410": "God of War",
+	"CUSA07411": "God of War",
+	"CUSA07412": "God of War",
+	"CUSA07413": "God of War",
 	"CUSA00133": "Killzone Shadow Fall",
+	"CUSA00003": "Killzone Shadow Fall",
 	"CUSA00138": "Knack",
+	"CUSA00001": "Knack",
 	"CUSA01019": "Gravity Rush Remastered",
+	"CUSA01021": "Gravity Rush Remastered",
+	"CUSA01114": "Gravity Rush 2",
+	"CUSA03694": "Gravity Rush 2",
 	"CUSA01127": "Until Dawn",
+	"CUSA01128": "Until Dawn",
+	"CUSA01129": "Until Dawn",
 	"CUSA03617": "Uncharted 4: A Thief's End",
 	"CUSA00194": "Shadow of the Colossus",
+	"CUSA00195": "Shadow of the Colossus",
 	"CUSA05670": "Persona 5",
 	"CUSA09263": "Gran Turismo Sport",
+	"CUSA00341": "The Order: 1886",
+	"CUSA00076": "The Order: 1886",
+	"CUSA04943": "The Last Guardian",
+	"CUSA03745": "The Last Guardian",
+	"CUSA00327": "Resogun",
+	"CUSA00328": "Resogun",
+	"CUSA04500": "Horizon Zero Dawn",
+}
+
+func extractPS4TitleFromSFO(saveDir string) string {
+	var foundTitle string
+	_ = filepath.Walk(saveDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		if strings.EqualFold(info.Name(), "param.sfo") {
+			data, err := os.ReadFile(path)
+			if err != nil || len(data) < 20 {
+				return nil
+			}
+			if string(data[:4]) == "\x00PSF" {
+				keyTableStart := binary.LittleEndian.Uint32(data[8:12])
+				dataTableStart := binary.LittleEndian.Uint32(data[12:16])
+				numEntries := binary.LittleEndian.Uint32(data[16:20])
+
+				pos := 20
+				for i := uint32(0); i < numEntries; i++ {
+					if pos+16 > len(data) {
+						break
+					}
+					keyOffset := uint32(binary.LittleEndian.Uint16(data[pos : pos+2]))
+					paramLen := binary.LittleEndian.Uint32(data[pos+4 : pos+8])
+					dataOffset := binary.LittleEndian.Uint32(data[pos+12 : pos+16])
+					pos += 16
+
+					kStart := keyTableStart + keyOffset
+					if kStart >= uint32(len(data)) {
+						continue
+					}
+					kEnd := kStart
+					for kEnd < uint32(len(data)) && data[kEnd] != 0 {
+						kEnd++
+					}
+					key := string(data[kStart:kEnd])
+
+					dStart := dataTableStart + dataOffset
+					dEnd := dStart + paramLen
+					if dEnd > uint32(len(data)) {
+						dEnd = uint32(len(data))
+					}
+					if dStart < dEnd {
+						valBytes := data[dStart:dEnd]
+						for len(valBytes) > 0 && valBytes[len(valBytes)-1] == 0 {
+							valBytes = valBytes[:len(valBytes)-1]
+						}
+						val := strings.TrimSpace(string(valBytes))
+						if key == "MAINTITLE" || (key == "TITLE" && foundTitle == "") {
+							clean := strings.TrimSuffix(val, " SaveData")
+							clean = strings.TrimSuffix(clean, " Savedata")
+							clean = strings.TrimSuffix(clean, " Save Data")
+							clean = strings.TrimSpace(clean)
+							if clean != "" {
+								foundTitle = clean
+								if key == "MAINTITLE" {
+									return filepath.SkipAll
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return nil
+	})
+	return foundTitle
+}
+
+func scanShadPS4Locations(appData, localAppData string, games *[]DetectedGame, seen map[string]bool) {
+	candidates := []string{}
+	if appData != "" {
+		candidates = append(candidates, filepath.Join(appData, "shadPS4"), filepath.Join(appData, "shadps4"))
+	}
+	if localAppData != "" {
+		candidates = append(candidates, filepath.Join(localAppData, "shadPS4"), filepath.Join(localAppData, "shadps4"))
+	}
+	if runtime.GOOS != "windows" {
+		home := os.Getenv("HOME")
+		if home != "" {
+			candidates = append(candidates,
+				filepath.Join(home, ".local", "share", "shadPS4"),
+				filepath.Join(home, ".local", "share", "shadps4"),
+				filepath.Join(home, ".var", "app", "net.shadps4.shadPS4", "data", "shadPS4"),
+			)
+		}
+	}
+
+	for _, cand := range candidates {
+		if stat, err := os.Stat(cand); err == nil && stat.IsDir() {
+			scanShadPS4Root(cand, games, seen)
+		}
+	}
+}
+
+func scanShadPS4Root(shadRoot string, games *[]DetectedGame, seen map[string]bool) {
+	if stat, err := os.Stat(shadRoot); err != nil || !stat.IsDir() {
+		return
+	}
+
+	// 1. Direct savedata: shadRoot/savedata
+	directSave := filepath.Join(shadRoot, "savedata")
+	if stat, err := os.Stat(directSave); err == nil && stat.IsDir() {
+		scanPS4SaveDir(directSave, shadRoot, games, seen)
+	}
+
+	// 2. User savedata: shadRoot/user/savedata
+	userSave := filepath.Join(shadRoot, "user", "savedata")
+	if stat, err := os.Stat(userSave); err == nil && stat.IsDir() {
+		scanPS4SaveDir(userSave, shadRoot, games, seen)
+	}
+
+	// 3. User home savedata: shadRoot/home/<userID>/savedata (e.g. Sako: home/1000/savedata)
+	homeDir := filepath.Join(shadRoot, "home")
+	if stat, err := os.Stat(homeDir); err == nil && stat.IsDir() {
+		entries, err := os.ReadDir(homeDir)
+		if err == nil {
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				userHomeSave := filepath.Join(homeDir, e.Name(), "savedata")
+				if stat, err := os.Stat(userHomeSave); err == nil && stat.IsDir() {
+					scanPS4SaveDir(userHomeSave, shadRoot, games, seen)
+				}
+			}
+		}
+	}
 }
 
 func scanPS4SaveDir(savedataPath, gameFolder string, games *[]DetectedGame, seen map[string]bool) {
@@ -2861,7 +3036,7 @@ func scanPS4SaveDir(savedataPath, gameFolder string, games *[]DetectedGame, seen
 		if isCUSAID(e.Name()) {
 			addPS4Game(subPath, gameFolder, e.Name(), games, seen)
 		} else {
-			// Subfolder could be user ID like "1" or "10000000"
+			// Subfolder could be user ID like "1" or "1000" or profile
 			nested, err := os.ReadDir(subPath)
 			if err == nil {
 				for _, n := range nested {
@@ -2881,23 +3056,32 @@ func isCUSAID(name string) bool {
 }
 
 func addPS4Game(saveDir, gameFolder, titleID string, games *[]DetectedGame, seen map[string]bool) {
-	if seen[saveDir] {
+	canonicalPath := strings.ToLower(filepath.Clean(saveDir))
+	if seen[canonicalPath] || seen[saveDir] {
 		return
 	}
 	count, size := getDirStats(saveDir)
 	if count == 0 {
 		return
 	}
+	seen[canonicalPath] = true
 	seen[saveDir] = true
 
 	titleIDUpper := strings.ToUpper(titleID)
 	baseGameName := ps4TitleMap[titleIDUpper]
 	if baseGameName == "" {
-		baseGameName = "PS4 Title (" + titleIDUpper + ")"
+		if sfoTitle := extractPS4TitleFromSFO(saveDir); sfoTitle != "" {
+			baseGameName = sfoTitle
+		} else {
+			baseGameName = "PS4 Title (" + titleIDUpper + ")"
+		}
 	}
 	displayName := baseGameName + " (PS4 Emulator / bbport)"
 
-	relPath, _ := filepath.Rel(gameFolder, saveDir)
+	relPath, err := filepath.Rel(gameFolder, saveDir)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		relPath = filepath.Join("savedata", titleIDUpper)
+	}
 	appID, iconURL, protonTier := resolveAppIDByName(baseGameName)
 
 	*games = append(*games, DetectedGame{
@@ -2982,11 +3166,8 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 	}
 
 	// 1. Direct check: Is rootDir itself a PS4 / ShadPS4 directory?
-	if stat, err := os.Stat(filepath.Join(rootDir, "savedata")); err == nil && stat.IsDir() {
-		scanPS4SaveDir(filepath.Join(rootDir, "savedata"), rootDir, games, seen)
-	} else if stat, err := os.Stat(filepath.Join(rootDir, "user", "savedata")); err == nil && stat.IsDir() {
-		scanPS4SaveDir(filepath.Join(rootDir, "user", "savedata"), rootDir, games, seen)
-	} else if isCUSAID(filepath.Base(rootDir)) {
+	scanShadPS4Root(rootDir, games, seen)
+	if isCUSAID(filepath.Base(rootDir)) {
 		addPS4Game(rootDir, filepath.Dir(rootDir), filepath.Base(rootDir), games, seen)
 	}
 
@@ -3015,11 +3196,31 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 			continue
 		}
 
-		// Direct check on gameFolder for PS4 emulator
-		if stat, err := os.Stat(filepath.Join(gameFolder, "savedata")); err == nil && stat.IsDir() {
-			scanPS4SaveDir(filepath.Join(gameFolder, "savedata"), gameFolder, games, seen)
-		} else if stat, err := os.Stat(filepath.Join(gameFolder, "user", "savedata")); err == nil && stat.IsDir() {
-			scanPS4SaveDir(filepath.Join(gameFolder, "user", "savedata"), gameFolder, games, seen)
+		// Direct check on gameFolder for PS4 emulator (savedata, user/savedata, home/*/savedata)
+		scanShadPS4Root(gameFolder, games, seen)
+
+		// Portable Switch (Eden, Yuzu, Suyu, Sudachi, Torzu, Citron)
+		for _, nandRel := range []string{
+			filepath.Join("user", "nand", "user", "save"),
+			filepath.Join("nand", "user", "save"),
+		} {
+			nandPath := filepath.Join(gameFolder, nandRel)
+			if stat, err := os.Stat(nandPath); err == nil && stat.IsDir() && !seen[nandPath] {
+				count, size := getDirStats(nandPath)
+				if count > 0 {
+					seen[nandPath] = true
+					*games = append(*games, DetectedGame{
+						ID:                 "emu_switch_portable_" + sanitizeID(entry.Name()),
+						Name:               fmt.Sprintf("Nintendo Switch Saves (%s)", entry.Name()),
+						SaveType:           SaveTypeInTree,
+						StorageType:          "Switch Emulator",
+						SourcePath:         nandPath,
+						TargetRelativePath: filepath.ToSlash(filepath.Join(entry.Name(), nandRel)),
+						FileCount:          count,
+						SizeBytes:          size,
+					})
+				}
+			}
 		}
 
 		// Portable RPCS3 (PS3)
@@ -3254,15 +3455,8 @@ func scanCustomPath(customPath string, games *[]DetectedGame, seen map[string]bo
 		return
 	}
 
-	// 1. Direct check: PS4 Emulator savedata
-	if stat, err := os.Stat(filepath.Join(customPath, "savedata")); err == nil && stat.IsDir() {
-		scanPS4SaveDir(filepath.Join(customPath, "savedata"), customPath, games, seen)
-		return
-	}
-	if stat, err := os.Stat(filepath.Join(customPath, "user", "savedata")); err == nil && stat.IsDir() {
-		scanPS4SaveDir(filepath.Join(customPath, "user", "savedata"), customPath, games, seen)
-		return
-	}
+	// 1. Direct check: PS4 Emulator savedata (savedata, user/savedata, home/*/savedata)
+	scanShadPS4Root(customPath, games, seen)
 	if isCUSAID(filepath.Base(customPath)) {
 		addPS4Game(customPath, filepath.Dir(customPath), filepath.Base(customPath), games, seen)
 		return
