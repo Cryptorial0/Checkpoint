@@ -109,7 +109,7 @@ Detects installed online multiplayer games with server-side progress and display
 
 - **v0.9 Beta (Current):** Standalone desktop application for Linux and Windows, automatic prefix detection, safe overwrite backups, and anti-cheat status checks.
 - **v1.0:** Polished interface, bug fixes, and stable public release.
-- **After 1.0 (Any OS to Any OS):** Full bidirectional cross-OS migration. Instead of having separate workflows, a single binary will be able to backup from any OS (Windows, Linux, macOS/SteamOS) and restore to any OS.
+- **After 1.0 (Any OS to Any OS):** Full bidirectional cross-OS migration. Backup from any supported OS (Windows, Linux, SteamOS) and restore to any supported OS.
 
 ## Building from Source
 
