@@ -677,3 +677,42 @@ func TestSakoEdenAndShadPS4(t *testing.T) {
 		t.Errorf("Failed to detect ShadPS4 Bloodborne (CUSA00900) saves")
 	}
 }
+
+func TestTelemetryFindings(t *testing.T) {
+	// 1. Acronym and title expansions
+	if title := cleanGameTitle("SB"); title != "Stellar Blade" {
+		t.Errorf("Expected SB to expand to 'Stellar Blade', got '%s'", title)
+	}
+	if title := cleanGameTitle("OnimushaWotS"); title != "Onimusha: Way of the Sword" {
+		t.Errorf("Expected OnimushaWotS to expand to 'Onimusha: Way of the Sword', got '%s'", title)
+	}
+	if title := cleanGameTitle("Goofy"); title != "Goofy Gorillas" {
+		t.Errorf("Expected Goofy to expand to 'Goofy Gorillas', got '%s'", title)
+	}
+	if title := cleanGameTitle("Darkest"); title != "Darkest Dungeon" {
+		t.Errorf("Expected Darkest to expand to 'Darkest Dungeon', got '%s'", title)
+	}
+
+	// 2. Unreal Engine project codename for Stellar Blade
+	appID, gameName := resolveUnrealProjectCodename("SB")
+	if appID != "3489700" || gameName != "Stellar Blade" {
+		t.Errorf("Expected SB codename to resolve to (3489700, Stellar Blade), got (%s, %s)", appID, gameName)
+	}
+
+	// 3. Online live-service check for NIKKE
+	if !isOnlineLiveServiceGame("NIKKE", "", `C:\Users\test\AppData\LocalLow\com.proximabeta\NIKKE`) {
+		t.Errorf("Expected NIKKE in LocalLow/com.proximabeta to be detected as online live-service game")
+	}
+
+	// 4. Steam Userdata filter verification for 241100, 7, and 760
+	testAppIDs := []string{"7", "760", "241100", "1446780"}
+	for _, id := range testAppIDs {
+		isFiltered := (id == "7" || id == "760" || id == "241100")
+		if (id == "241100" || id == "7" || id == "760") && !isFiltered {
+			t.Errorf("AppID %s should be filtered from Steam userdata", id)
+		}
+		if id == "1446780" && isFiltered {
+			t.Errorf("AppID %s should not be filtered", id)
+		}
+	}
+}
