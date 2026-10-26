@@ -1,0 +1,18 @@
+# Compiled binaries & build outputs
+/bin/
+*.exe
+*.AppImage
+*.log
+save-migrator
+checkpoint
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Internal specifications & planning documents
+linux.md
+plan.md
+

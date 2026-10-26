@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkpoint - Game Save & Emulator Migration</title>
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <img src="icon.svg" class="app-logo" alt="Checkpoint Logo" width="28" height="28">
+        <h1>Checkpoint</h1>
+        <span class="badge" style="background-color: #2ea043; color: #0d1117; font-weight: bold; border-color: #2ea043;">BETA v0.9</span>
+        <span class="badge" id="os-badge" style="background-color: #1f6feb; color: #ffffff;">Linux</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="mode-toggle-group" id="mode-switcher">
+          <button id="btn-mode-restore" class="mode-btn active" type="button">Restore Saves</button>
+          <button id="btn-mode-backup" class="mode-btn" type="button">Backup Saves</button>
+        </div>
+        <button id="btn-refresh" class="btn-subtle">Refresh</button>
+      </div>
+    </header>
+
+    <!-- Prominent Mode Banners -->
+    <div id="banner-restore" class="alert alert-info" style="margin-bottom: 20px; border-left: 4px solid #00d2aa; background-color: rgba(0, 210, 170, 0.1);">
+      <div>
+        <div style="font-weight: 600; color: #f0f6fc;">Checkpoint (Beta v0.9)</div>
+        <div style="font-size: 12px; color: #c9d1d9;">Select your <code>game_saves_bundle.zip</code> to restore. Auto-detects <strong>Hydra Launcher</strong> prefixes first, then <strong>Heroic</strong> and <strong>Lutris</strong>, with case-insensitive Wine navigation and <strong>Steam Cloud Timestamp Protection</strong>.</div>
+      </div>
+    </div>
+
+    <div id="banner-backup" class="alert alert-warning hidden" style="margin-bottom: 20px; border-left: 4px solid #d29922;">
+      <div>
+        <div style="font-weight: 600;">Game Save Backup Mode</div>
+        <div style="font-size: 12px; color: #c9d1d9;">Scans, packages, and verifies non-cloud PC game saves, offline Steam emulators, and console emulator memory cards into a single portable vault.</div>
+      </div>
+    </div>
+
+    <!-- System Checks -->
+    <div id="syscheck-card" class="card hidden">
+      <div class="card-title">System Status</div>
+      <div id="syscheck-content"></div>
+    </div>
+
+    <!-- ==================== LINUX RESTORER WORKFLOW ==================== -->
+    <section id="restore-content">
+      <div class="card">
+        <div class="card-title">Select Backup Vault Archive</div>
+        <p class="description">Select a <code>game_saves_bundle.zip</code> archive or uncompressed vault folder created by Checkpoint.</p>
+
+        <!-- Drag & Drop Zone -->
+        <div id="vault-drop-zone" class="drop-zone">
+          <svg class="drop-zone-icon" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+          <div style="font-size: 13px; font-weight: 600; color: #f0f6fc;">Drag & drop game_saves_bundle.zip here</div>
+          <div style="font-size: 11px; color: #8b949e; margin-top: 4px;">or click below to browse</div>
+        </div>
+
+        <div class="input-row">
+          <label for="vault-path">Vault Archive Path (.zip or folder):</label>
+          <div class="input-group">
+            <input type="text" id="vault-path" placeholder="Click Browse to select game_saves_bundle.zip...">
+            <button id="btn-browse-vault" class="btn-subtle" type="button">Browse (.zip)...</button>
+            <button id="btn-inspect-vault" class="btn-primary" type="button">
+              <span id="inspect-spinner" class="spinner hidden"></span>
+              <span id="inspect-btn-text">Inspect Vault</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Load Chips for Found Bundles -->
+        <div id="quick-load-container" class="quick-load-bar hidden">
+          <span>Found Vaults:</span>
+          <div id="quick-load-chips" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+        </div>
+
+        <!-- Vault Manifest Summary Card -->
+        <div id="vault-summary-card" class="alert alert-info hidden" style="margin-top: 14px; border-left: 4px solid #00d2aa;">
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <span style="font-weight: 600; font-size: 13px; color: #f0f6fc;" id="vault-summary-title">Vault Loaded</span>
+              <span style="font-size: 12px; color: #8b949e; display: block; margin-top: 2px;" id="vault-summary-details">Manifest details.</span>
+            </div>
+            <div id="vault-summary-stats" style="text-align: right; font-size: 12px; color: #00d2aa; font-weight: 600;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detected Vault Games Grid -->
+      <div id="restore-games-card" class="card hidden">
+        <div class="card-title">Vault Saves & Destination Mapping</div>
+        <p class="description">Review target prefixes and destinations. Checkpoint automatically validates initialized Wine prefixes and applies Steam Cloud timestamp protection.</p>
+
+        <div id="restore-toolbar" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="font-weight: 600; font-size: 14px; color: #f0f6fc;">Vault Titles</span>
+              <button id="btn-restore-select-all" class="btn-subtle" style="font-size: 11px; padding: 3px 8px;" type="button">Select All</button>
+              <button id="btn-restore-deselect-all" class="btn-subtle" style="font-size: 11px; padding: 3px 8px;" type="button">Deselect All</button>
+              <button id="btn-restore-select-detected" class="btn-subtle" style="font-size: 11px; padding: 3px 8px;" type="button">Select Detected Only</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <label for="global-launcher-select" style="font-size: 12px; color: #8b949e; white-space: nowrap;">Target Launcher (All Titles):</label>
+              <select id="global-launcher-select" class="launcher-select">
+                <option value="auto">Auto (Hydra → Heroic → Lutris)</option>
+                <option value="hydra">Hydra Launcher (SteamID Prefixes)</option>
+                <option value="heroic">Heroic Games Launcher</option>
+                <option value="lutris">Lutris</option>
+                <option value="steam">Steam Proton</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+            <div style="position: relative; flex: 1;">
+              <input type="text" id="restore-search-input" placeholder="Search by game name, AppID, type, or destination path..." style="width: 100%; box-sizing: border-box; padding: 6px 30px 6px 32px; border-radius: 6px; background-color: #0d1117; border: 1px solid #30363d; color: #f0f6fc; font-size: 12px;">
+              <svg style="position: absolute; left: 10px; top: 7px; width: 14px; height: 14px; fill: #8b949e; pointer-events: none;" viewBox="0 0 16 16"><path d="M11.5 7a4.499 4.499 0 1 1-8.998 0A4.499 4.499 0 0 1 11.5 7zm-.82 4.74a6 6 0 1 0-1.06 1.06l3.04 3.04a.75.75 0 1 0 1.06-1.06l-3.04-3.04z"></path></svg>
+              <button id="btn-restore-clear-search" class="hidden" style="position: absolute; right: 8px; top: 4px; background: none; border: none; color: #8b949e; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px;" type="button" title="Clear search">×</button>
+            </div>
+            <div id="restore-search-count" style="font-size: 12px; color: #8b949e; white-space: nowrap;" class="hidden"></div>
+          </div>
+        </div>
+
+        <div id="restore-results" class="results-container">
+          <div class="empty-state">Load a vault archive to display game saves.</div>
+        </div>
+
+        <!-- Online Games & Anti-Cheat (Restorer View) -->
+        <div id="online-games-restore-section" class="hidden" style="margin-top: 20px;">
+          <div class="card-title" style="font-size: 14px;">Online Games and Anti-Cheat Compatibility</div>
+          <p class="description" style="margin-bottom: 8px;">These games store progress on external servers (no local save files needed), but require checking online anti-cheat compatibility.</p>
+          <div id="online-games-restore-results" class="results-container" style="max-height: 200px;"></div>
+        </div>
+
+        <div class="backup-actions">
+          <!-- Real-Time Progress Bar (Restore) -->
+          <div id="restore-progress-container" class="progress-box hidden" style="margin-top: 14px; margin-bottom: 14px; border-left-color: #00d2aa;">
+            <div class="progress-header">
+              <div style="display: flex; align-items: center;">
+                <span id="restore-spinner" class="spinner spinner-teal"></span>
+                <span id="restore-progress-status" class="progress-status-text">Restoring save games...</span>
+              </div>
+              <span id="restore-progress-percent" class="progress-percent-text">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="restore-progress-bar-fill" class="progress-fill"></div>
+            </div>
+            <div id="restore-progress-detail" class="progress-detail-text"></div>
+          </div>
+
+          <div id="restore-report-card" class="alert alert-info hidden" style="margin-bottom: 14px; border-left: 4px solid #2ea043;"></div>
+
+          <button id="btn-start-restore" class="btn-primary" disabled>Restore Selected Saves</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== BACKUP WORKFLOW ==================== -->
+    <section id="backup-content" class="hidden">
+      <div class="card">
+        <div class="card-title">Scan Game Locations</div>
+        <p class="description">Scans standard directories, offline emulators (RUNE, CODEX, Goldberg, FLT), console emulators (RPCS3, PCSX2, Ryujinx, Yuzu, Dolphin, Cemu, Xenia, DuckStation), Documents, and custom game folders.</p>
+        
+        <div class="input-row">
+          <label for="custom-scan-path">Additional Game Scan Folders:</label>
+          <div class="input-group">
+            <input type="text" id="custom-scan-path" placeholder="e.g. ~/Games/Bloodborne or /mnt/games">
+            <button id="btn-browse-scan" class="btn-subtle" type="button">Browse...</button>
+            <button id="btn-add-path" class="btn-secondary" type="button">+ Add Folder</button>
+            <button id="btn-scan" class="btn-primary">
+              <span id="scan-spinner" class="spinner hidden"></span>
+              <span id="scan-btn-text">Scan Games</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="custom-paths-container" class="custom-paths-container hidden">
+          <div class="custom-paths-label">Active Custom Scan Paths:</div>
+          <div id="custom-paths-list" class="custom-paths-list"></div>
+        </div>
+
+        <!-- Real-Time Visual Progress Bar (Scan) -->
+        <div id="progress-container" class="progress-box hidden">
+          <div class="progress-header">
+            <div style="display: flex; align-items: center;">
+              <span id="scan-progress-spinner" class="spinner spinner-teal"></span>
+              <span id="progress-status" class="progress-status-text">Scanning games...</span>
+            </div>
+            <span id="progress-percent" class="progress-percent-text">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="progress-bar-fill" class="progress-fill"></div>
+          </div>
+          <div id="progress-detail" class="progress-detail-text"></div>
+        </div>
+
+        <div id="scan-toolbar" class="scan-toolbar hidden" style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="font-weight: 600; font-size: 14px; color: #f0f6fc;">Detected Titles</span>
+              <button id="btn-select-all" class="btn-subtle" style="font-size: 11px; padding: 3px 8px;" type="button">Select All</button>
+              <button id="btn-deselect-all" class="btn-subtle" style="font-size: 11px; padding: 3px 8px;" type="button">Deselect All</button>
+              <label style="font-size: 12px; color: #8b949e; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: 6px;">
+                <input type="checkbox" id="chk-skip-steam-cloud"> Skip Steam Cloud games
+              </label>
+              <label style="font-size: 12px; color: #8b949e; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: 6px;">
+                <input type="checkbox" id="chk-skip-user-settings"> Skip user settings & client configs
+              </label>
+              <label style="font-size: 12px; color: #8b949e; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: 6px;">
+                <input type="checkbox" id="chk-telemetry-share"> Share anonymous detection report
+              </label>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-copy-report" class="btn-subtle" style="font-size: 12px; padding: 5px 12px;" type="button">Copy Report</button>
+              <button id="btn-export-report" class="btn-secondary" style="font-size: 12px; padding: 5px 12px;" type="button">Export Report (.txt)</button>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+            <div style="position: relative; flex: 1;">
+              <input type="text" id="game-search-input" placeholder="Search detected titles by name, AppID, type, or path..." style="width: 100%; box-sizing: border-box; padding: 6px 30px 6px 32px; border-radius: 6px; background-color: #0d1117; border: 1px solid #30363d; color: #f0f6fc; font-size: 12px;">
+              <svg style="position: absolute; left: 10px; top: 7px; width: 14px; height: 14px; fill: #8b949e; pointer-events: none;" viewBox="0 0 16 16"><path d="M11.5 7a4.499 4.499 0 1 1-8.998 0A4.499 4.499 0 0 1 11.5 7zm-.82 4.74a6 6 0 1 0-1.06 1.06l3.04 3.04a.75.75 0 1 0 1.06-1.06l-3.04-3.04z"></path></svg>
+              <button id="btn-clear-search" class="hidden" style="position: absolute; right: 8px; top: 4px; background: none; border: none; color: #8b949e; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px;" type="button" title="Clear search">×</button>
+            </div>
+            <div id="search-count" style="font-size: 12px; color: #8b949e; white-space: nowrap;" class="hidden"></div>
+          </div>
+        </div>
+
+        <div id="scan-results" class="results-container">
+          <div class="empty-state">Click 'Scan Games' to find installed game saves.</div>
+        </div>
+
+        <!-- Space Requirement Summary -->
+        <div id="space-summary-card" class="alert alert-info hidden" style="margin-top: 14px; margin-bottom: 14px; border-left: 4px solid #58a6ff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <span style="font-weight: 600; font-size: 13px; color: #f0f6fc;">Required Backup Space:</span>
+              <span style="font-size: 13px; color: #58a6ff; font-weight: 700; margin-left: 6px;" id="space-req-amount">0 MB</span>
+              <span style="font-size: 12px; color: #8b949e; display: block; margin-top: 2px;" id="space-req-detail">Calculated for selected titles.</span>
+            </div>
+            <div id="space-target-summary" style="text-align: right; font-size: 12px; color: #c9d1d9;"></div>
+          </div>
+        </div>
+
+        <!-- Online Games & Anti-Cheat -->
+        <div id="online-games-section" class="hidden" style="margin-top: 20px;">
+          <div class="card-title" style="font-size: 14px;">Online Games and Anti-Cheat Compatibility</div>
+          <p class="description" style="margin-bottom: 8px;">These games store progress on external servers (no local save files needed), but require checking online anti-cheat compatibility.</p>
+          <div id="online-games-results" class="results-container" style="max-height: 200px;"></div>
+        </div>
+
+        <div class="backup-actions">
+          <div class="input-row">
+            <label for="backup-dest">Backup Target Folder (USB drive or local folder):</label>
+            <div class="input-group">
+              <input type="text" id="backup-dest" placeholder="Click Browse to select destination folder...">
+              <button id="btn-browse-dest" class="btn-subtle" type="button">Browse...</button>
+              <button id="btn-eject-usb" class="btn-subtle hidden" type="button">Safely Eject USB</button>
+            </div>
+            <div id="usb-detect-badge" class="hidden" style="margin-top: 6px; font-size: 12px; color: #58a6ff; font-weight: 500;"></div>
+            <div id="disk-space-badge" class="hidden" style="margin-top: 6px; font-size: 12px; font-weight: 500;"></div>
+          </div>
+          
+          <!-- Dedicated Backup Progress Bar -->
+          <div id="backup-progress-container" class="progress-box hidden" style="margin-top: 14px; margin-bottom: 14px; border-left-color: #1f6feb;">
+            <div class="progress-header">
+              <div style="display: flex; align-items: center;">
+                <span id="backup-spinner" class="spinner spinner-teal"></span>
+                <span id="backup-progress-status" class="progress-status-text">Creating backup...</span>
+              </div>
+              <span id="backup-progress-percent" class="progress-percent-text" style="color: #58a6ff;">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="backup-progress-bar-fill" class="progress-fill" style="background: linear-gradient(90deg, #1f6feb, #58a6ff);"></div>
+            </div>
+            <div id="backup-progress-detail" class="progress-detail-text"></div>
+          </div>
+
+          <div id="backup-verify-card" class="alert alert-info hidden" style="margin-bottom: 14px;"></div>
+
+          <button id="btn-backup" class="btn-primary" disabled>Start Backup</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Execution Logs -->
+    <div class="card">
+      <div class="card-title">Operation Log</div>
+      <pre id="log-box">Ready.</pre>
+    </div>
+  </div>
+
+  <!-- Anonymous Telemetry Opt-In Modal -->
+  <div id="telemetry-modal" class="modal-backdrop hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; max-width: 480px; width: 90%; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+        <svg style="width: 20px; height: 20px; fill: #2ea043;" viewBox="0 0 16 16"><path d="M8 0a8 8 0 100 16A8 8 0 008 0zm3.78 6.97l-4.25 4.25a.75.75 0 01-1.06 0L4.22 8.97a.75.75 0 011.06-1.06l1.72 1.72 3.72-3.72a.75.75 0 011.06 1.06z"/></svg>
+        <h3 style="margin: 0; font-size: 16px; color: #f0f6fc;">Help Improve Checkpoint</h3>
+      </div>
+      <p style="font-size: 13px; color: #c9d1d9; line-height: 1.5; margin-bottom: 10px;">
+        Would you like to help improve game detection? Anonymous scan reports can be automatically shared with <code>reports.cryptori.al</code> to help map unknown indie games and engine codenames.
+      </p>
+      <div style="background: #0d1117; border-left: 3px solid #2ea043; padding: 10px; border-radius: 4px; font-size: 12px; color: #8b949e; line-height: 1.4; margin-bottom: 16px;">
+        <strong>Strict Privacy:</strong> Personal usernames, machine identifiers, and save file contents are never read, bundled, or transmitted.
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button id="btn-telemetry-deny" class="btn-subtle" style="font-size: 12px; padding: 6px 14px;" type="button">No, Keep Private</button>
+        <button id="btn-telemetry-allow" class="btn-primary" style="font-size: 12px; padding: 6px 14px;" type="button">Allow Anonymous Reports</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
