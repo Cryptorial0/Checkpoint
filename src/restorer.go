@@ -108,7 +108,7 @@ func enrichManifest(manifest *VaultManifest) {
 
 			computeAllLauncherTargets(g)
 
-			// Default to Auto resolution (Hydra -> Heroic -> Lutris for standalone games)
+			// Default to Auto resolution (Hydra -> Heroic -> Lutris for offline games)
 			autoPath, statusKey, statusText, chosenLauncher := AutoLocateLinuxTarget(*g)
 			g.TargetStatus = statusKey
 			g.TargetStatusText = statusText
@@ -659,7 +659,7 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 	return "", ""
 }
 
-// AutoLocateLinuxTarget resolves target paths with strict priority order for standalone games:
+// AutoLocateLinuxTarget resolves target paths with strict priority order for offline games:
 // 1. Console Emulators (if emulator save)
 // 2. Hydra Launcher (uses AppID / SteamID)
 // 3. Heroic Games Launcher (uses custom game name / title)
@@ -704,7 +704,7 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 	}
 
 	// ==========================================
-	// STANDALONE GAME PRIORITY DETECTION
+	// OFFLINE GAME PRIORITY DETECTION
 	// 1st: Hydra Launcher (AppID)
 	// 2nd: Heroic (Custom Name)
 	// 3rd: Lutris
@@ -751,7 +751,7 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 	}
 
 	// If prefix not created yet on disk:
-	// For standalone games, default target is Hydra Launcher (or Heroic if no AppID)
+	// For offline games, default target is Hydra Launcher (or Heroic if no AppID)
 	if meta.AppID != "" {
 		expected := ExpectedHydraPath(meta.AppID, meta.TargetRelativePath)
 		return expected, "not_initialized", "Prefix Not Initialized (Launch once in Hydra/Heroic)", "hydra"
