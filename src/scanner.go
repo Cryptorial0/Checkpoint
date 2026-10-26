@@ -990,7 +990,7 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 	var games []DetectedGame
 	seenPaths := make(map[string]bool)
 
-	SetProgress("scan", 5, "Scanning Windows Public Documents & offline emulators...", 0, 100, "")
+	SetProgress("scan", 5, "Scanning Windows Public Documents & offline profiles...", 0, 100, "")
 
 	// 1. Emulator, Profile & Documents Scans
 	scanPublicDocuments(&games, seenPaths)
@@ -1200,15 +1200,13 @@ func hasLocalSteamManifest(appID string) bool {
 }
 
 func isLegitimateSteamCloudGame(g DetectedGame) bool {
-	// Offline emulators and PS4 emulators are NEVER Steam Cloud managed
+	// Offline profiles and PS4 emulators are NEVER Steam Cloud managed
 	lowerStorage := strings.ToLower(g.StorageType)
-	if strings.Contains(lowerStorage, "rune") ||
-		strings.Contains(lowerStorage, "codex") ||
-		strings.Contains(lowerStorage, "goldberg") ||
-		strings.Contains(lowerStorage, "empress") ||
-		strings.Contains(lowerStorage, "flt") ||
+	if strings.Contains(lowerStorage, "offline") ||
+		strings.Contains(lowerStorage, "profile") ||
 		strings.Contains(lowerStorage, "ps4") ||
-		strings.Contains(lowerStorage, "bbport") {
+		strings.Contains(lowerStorage, "bbport") ||
+		strings.Contains(lowerStorage, "emulator") {
 		return false
 	}
 
@@ -1348,15 +1346,15 @@ func scanPublicDocuments(games *[]DetectedGame, seen map[string]bool) {
 
 	// Pattern A: RUNE
 	runeBase := filepath.Join(publicDocPath, "Steam", "RUNE")
-	scanAppIDSubdirs(runeBase, "RUNE", "users/Public/Documents/Steam/RUNE", games, seen)
+	scanAppIDSubdirs(runeBase, "Offline Profile", "users/Public/Documents/Steam/RUNE", games, seen)
 
 	// Pattern B: CODEX
 	codexBase := filepath.Join(publicDocPath, "Steam", "CODEX")
-	scanAppIDSubdirs(codexBase, "CODEX", "users/Public/Documents/Steam/CODEX", games, seen)
+	scanAppIDSubdirs(codexBase, "Offline Profile", "users/Public/Documents/Steam/CODEX", games, seen)
 
 	// Pattern C: EMPRESS
 	empressBase := filepath.Join(publicDocPath, "EMPRESS")
-	scanAppIDSubdirs(empressBase, "EMPRESS", "users/Public/Documents/EMPRESS", games, seen)
+	scanAppIDSubdirs(empressBase, "Offline Profile", "users/Public/Documents/EMPRESS", games, seen)
 }
 
 func getSteamPathFromRegistry() string {
@@ -1521,17 +1519,17 @@ func scanUserAppData(games *[]DetectedGame, seen map[string]bool) {
 	// Goldberg
 	if appData != "" {
 		goldbergBase := filepath.Join(appData, "Goldberg SteamEmu Saves")
-		scanAppIDSubdirs(goldbergBase, "Goldberg", "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves", games, seen)
+		scanAppIDSubdirs(goldbergBase, "Offline Profile", "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves", games, seen)
 
 		// FLT
 		fltBase := filepath.Join(appData, "FLT")
-		scanAppIDSubdirs(fltBase, "FLT", "users/steamuser/AppData/Roaming/FLT", games, seen)
+		scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
 	}
 
 	// SKIDROW
 	if localAppData != "" {
 		skidrowBase := filepath.Join(localAppData, "SKIDROW")
-		scanAppIDSubdirs(skidrowBase, "SKIDROW", "users/steamuser/AppData/Local/SKIDROW", games, seen)
+		scanAppIDSubdirs(skidrowBase, "Offline Profile", "users/steamuser/AppData/Local/SKIDROW", games, seen)
 
 		// Unreal Engine 4 & 5 AppData/Local Saves (e.g. TEKKEN 8, Hogwarts Legacy, Palworld, Remnant II)
 		scanLocalAppDataUnrealGames(localAppData, games, seen)
@@ -2598,7 +2596,7 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 		if nameLow == "cpy_saves" {
 			cpyBase := filepath.Join(subPath, "CPY")
 			if stat, err := os.Stat(cpyBase); err == nil && stat.IsDir() {
-				scanAppIDSubdirs(cpyBase, "CPY", "users/steamuser/Documents/CPY_SAVES/CPY", games, seen)
+				scanAppIDSubdirs(cpyBase, "Offline Profile", "users/steamuser/Documents/CPY_SAVES/CPY", games, seen)
 			}
 			continue
 		}
@@ -3131,10 +3129,10 @@ func scanAppIDSubdirs(basePath, storageType, targetRelBase string, games *[]Dete
 		}
 
 		seen[fullPath] = true
-		gameName = fmt.Sprintf("%s (%s Emulator Profile)", gameName, storageType)
+		gameName = fmt.Sprintf("%s (%s)", gameName, storageType)
 
 		*games = append(*games, DetectedGame{
-			ID:                 storageType + "_" + appID,
+			ID:                 "profile_" + appID,
 			Name:               gameName,
 			AppID:              appID,
 			SaveType:           SaveTypePrefix,
@@ -3428,7 +3426,7 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 								Name:               appName,
 								AppID:              appID,
 								SaveType:           SaveTypeInTree,
-								StorageType:          "Portable Goldberg",
+								StorageType:          "Offline Profile",
 								SourcePath:         saveSub,
 								TargetRelativePath: filepath.ToSlash(relPath),
 								FileCount:          count,
