@@ -9,9 +9,9 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build & Release Artifacts
-    runs-on: ubuntu-24.04
+  build-windows:
+    name: Build Windows Executable
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -23,23 +23,51 @@ jobs:
           cache: true
           cache-dependency-path: src/go.sum
 
-      - name: Install Linux Build Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev squashfs-tools file
-
-      - name: Build Windows Executable
+      - name: Compile Windows Executable
         run: |
           mkdir -p dist
           cd src
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o ../dist/checkpoint.exe .
-          cd ..
 
-      - name: Build Linux ELF Binary
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: dist/checkpoint.exe
+          retention-days: 1
+
+  build-linux:
+    name: Build Linux Binaries & AppImage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Cache APT Packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      - name: Install Linux Build Dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev squashfs-tools file
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+          cache-dependency-path: src/go.sum
+
+      - name: Compile Linux ELF Binary
+        run: |
+          mkdir -p dist
           cd src
           go build -ldflags="-s -w" -o ../dist/checkpoint .
-          cd ..
 
       - name: Package Linux AppImage
         run: |
@@ -78,10 +106,37 @@ jobs:
           (cd /tmp && ./appimagetool --appimage-extract)
           ARCH=x86_64 /tmp/squashfs-root/AppRun AppDir "dist/checkpoint-${TAG_NAME}.AppImage"
 
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux
+          path: |
+            dist/checkpoint
+            dist/checkpoint-*.AppImage
+          retention-days: 1
+
+  publish:
+    name: Publish GitHub Release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-windows
+          path: dist
+
+      - name: Download Linux Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-linux
+          path: dist
+
       - name: Generate Checksums
         run: |
           cd dist
           sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
           cd ..
 
       - name: Publish Release Assets
