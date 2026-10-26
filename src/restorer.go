@@ -624,15 +624,21 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 5. Nintendo Switch (Ryujinx)
-	if strings.Contains(cLow, "ryujinx") || strings.HasPrefix(idLow, "ryujinx_") {
+	// 5. Nintendo Switch (Ryujinx, Yuzu, Suyu, Eden, Sudachi, Torzu, Citron)
+	if strings.Contains(cLow, "switch") || strings.Contains(cLow, "ryujinx") || strings.Contains(cLow, "yuzu") || strings.Contains(cLow, "suyu") || strings.Contains(cLow, "eden") || strings.Contains(cLow, "sudachi") || strings.HasPrefix(idLow, "emu_") {
 		cands := []string{
 			filepath.Join(home, ".config", "Ryujinx"),
 			filepath.Join(home, ".var", "app", "org.ryujinx.Ryujinx", "config", "Ryujinx"),
+			filepath.Join(home, ".local", "share", "eden"),
+			filepath.Join(home, ".local", "share", "yuzu"),
+			filepath.Join(home, ".local", "share", "suyu"),
+			filepath.Join(home, ".local", "share", "sudachi"),
+			filepath.Join(home, ".var", "app", "org.yuzu_emu.yuzu", "data", "yuzu"),
+			filepath.Join(home, ".var", "app", "org.suyu_emu.suyu", "data", "suyu"),
 		}
 		for _, cand := range cands {
 			if stat, err := os.Stat(cand); err == nil && stat.IsDir() {
-				return cand, "Auto-Detected Ryujinx"
+				return cand, "Auto-Detected " + filepath.Base(cand)
 			}
 		}
 	}

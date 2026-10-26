@@ -618,3 +618,62 @@ func TestLocalizedDocumentsAndLocalLow(t *testing.T) {
 		t.Errorf("Expected at least 3 games detected in LocalLow, got %d", len(localLowGames))
 	}
 }
+
+func TestSakoEdenAndShadPS4(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sako_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Mock Sako's AppData/Roaming structure
+	appData := filepath.Join(tmpDir, "AppData", "Roaming")
+
+	// 1. Sako's Eden path: AppData/Roaming/eden/nand/user/save
+	edenSaveDir := filepath.Join(appData, "eden", "nand", "user", "save", "0000000000000000", "6BC8AB52B3E88CC597064CE5B8704CED", "010019A01E2F2000")
+	if err := os.MkdirAll(edenSaveDir, 0755); err != nil {
+		t.Fatalf("Failed to create eden dir: %v", err)
+	}
+	os.WriteFile(filepath.Join(edenSaveDir, "save.bin"), []byte("SWITCH_SAVE_DATA"), 0644)
+
+	// 2. Sako's ShadPS4 path: AppData/Roaming/shadPS4/home/1000/savedata/CUSA00900/SPRJ0005/sce_sys
+	bbDir := filepath.Join(appData, "shadPS4", "home", "1000", "savedata", "CUSA00900", "SPRJ0005", "sce_sys")
+	if err := os.MkdirAll(bbDir, 0755); err != nil {
+		t.Fatalf("Failed to create shadPS4 bb dir: %v", err)
+	}
+	// Copy actual SFO from /tmp/sako_ps4 if available, or write dummy save
+	sfoSource := "/tmp/sako_ps4/savedata/CUSA00900/SPRJ0005/sce_sys/param.sfo"
+	if sfoData, err := os.ReadFile(sfoSource); err == nil {
+		os.WriteFile(filepath.Join(bbDir, "param.sfo"), sfoData, 0644)
+	} else {
+		os.WriteFile(filepath.Join(bbDir, "param.sfo"), []byte("DUMMY_SFO"), 0644)
+	}
+	os.WriteFile(filepath.Join(filepath.Dir(bbDir), "userdata0000"), []byte("BB_USERDATA"), 0644)
+
+	var detected []DetectedGame
+	seen := make(map[string]bool)
+	scanAppDataEmulators(appData, &detected, seen)
+
+	t.Logf("Detected %d emulators from Sako AppData:", len(detected))
+	foundEden := false
+	foundBloodborne := false
+	for _, g := range detected {
+		t.Logf(" - [%s] %s (Storage: %s, Rel: %s, Files: %d)", g.ID, g.Name, g.StorageType, g.TargetRelativePath, g.FileCount)
+		if g.ID == "emu_eden" {
+			foundEden = true
+		}
+		if g.ID == "ps4_cusa00900" {
+			foundBloodborne = true
+			if !strings.Contains(g.Name, "Bloodborne") {
+				t.Errorf("Expected Bloodborne in game name, got: %s", g.Name)
+			}
+		}
+	}
+
+	if !foundEden {
+		t.Errorf("Failed to detect Eden Switch emulator saves")
+	}
+	if !foundBloodborne {
+		t.Errorf("Failed to detect ShadPS4 Bloodborne (CUSA00900) saves")
+	}
+}
