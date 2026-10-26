@@ -23,10 +23,14 @@ jobs:
           cache: true
           cache-dependency-path: src/go.sum
 
+      - name: Install go-winres
+        run: go install github.com/tc-hib/go-winres@latest
+
       - name: Compile Windows Executable
         run: |
           mkdir -p dist
           cd src
+          go-winres make --arch amd64 --product-version git-tag --file-version git-tag
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o ../dist/checkpoint.exe .
 
       - name: Upload Windows Artifact

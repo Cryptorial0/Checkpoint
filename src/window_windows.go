@@ -26,7 +26,7 @@ func runEmbeddedAppWindow(url string) bool {
 		Debug:    false,
 		DataPath: dataPath,
 		WindowOptions: webview2.WindowOptions{
-			Title:  "Checkpoint (Beta v0.9)",
+			Title:  "Checkpoint (Beta v0.9.1)",
 			Width:  980,
 			Height: 820,
 			Center: true,
@@ -40,7 +40,7 @@ func runEmbeddedAppWindow(url string) bool {
 	}
 	defer w.Destroy()
 
-	w.SetTitle("Checkpoint (Beta v0.9)")
+	w.SetTitle("Checkpoint (Beta v0.9.1)")
 	w.SetSize(980, 820, webview2.HintNone)
 	w.Navigate(url)
 
