@@ -23,6 +23,8 @@ import (
 //go:embed web/*
 var webFiles embed.FS
 
+//go:generate go-winres make --arch amd64
+
 type ScanRequest struct {
 	CustomPath  string   `json:"custom_path"`
 	CustomPaths []string `json:"custom_paths"`
@@ -54,7 +56,7 @@ type ExportReportRequest struct {
 
 func main() {
 	InitLogger()
-	Log("Checkpoint starting up (v0.9 Beta)...")
+	Log("Checkpoint starting up (v0.9.1 Beta)...")
 
 	versionFlag := flag.Bool("v", false, "Show version and exit")
 	versionLongFlag := flag.Bool("version", false, "Show version and exit")
@@ -65,7 +67,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag || *versionLongFlag {
-		fmt.Println("Checkpoint v0.9 Beta")
+		fmt.Println("Checkpoint v0.9.1 Beta")
 		return
 	}
 
