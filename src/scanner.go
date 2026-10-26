@@ -719,6 +719,8 @@ func resolveUnrealProjectCodename(folderName string) (appID string, gameName str
 		return "3404260", "Dead as Disco"
 	case "coltrane":
 		return "2437390", "Enginefall"
+	case "sb":
+		return "3489700", "Stellar Blade"
 	}
 	return "", ""
 }
@@ -909,29 +911,37 @@ func splitCamelCase(s string) string {
 
 func expandGamingAcronyms(title string) string {
 	tLow := strings.ToLower(strings.TrimSpace(title))
+	noSpaces := strings.ReplaceAll(tLow, " ", "")
 	acronymMap := map[string]string{
-		"gtav":   "Grand Theft Auto V",
-		"gta v":  "Grand Theft Auto V",
-		"gta5":   "Grand Theft Auto 5",
-		"gta 5":  "Grand Theft Auto 5",
-		"gtaiv":  "Grand Theft Auto IV",
-		"gta iv": "Grand Theft Auto IV",
-		"gta4":   "Grand Theft Auto 4",
-		"gta 4":  "Grand Theft Auto 4",
-		"gta":    "Grand Theft Auto",
-		"tlou2":  "The Last of Us Part II",
-		"tlou 2": "The Last of Us Part II",
-		"tlou":   "The Last of Us",
-		"gow3":   "God of War III",
-		"gow 3":  "God of War III",
-		"gow":    "God of War",
-		"re4":    "Resident Evil 4",
-		"re2":    "Resident Evil 2",
-		"re3":    "Resident Evil 3",
-		"re7":    "Resident Evil 7",
-		"re8":    "Resident Evil Village",
+		"gtav":         "Grand Theft Auto V",
+		"gta v":        "Grand Theft Auto V",
+		"gta5":         "Grand Theft Auto 5",
+		"gta 5":        "Grand Theft Auto 5",
+		"gtaiv":        "Grand Theft Auto IV",
+		"gta iv":       "Grand Theft Auto IV",
+		"gta4":         "Grand Theft Auto 4",
+		"gta 4":        "Grand Theft Auto 4",
+		"gta":          "Grand Theft Auto",
+		"tlou2":        "The Last of Us Part II",
+		"tlou 2":       "The Last of Us Part II",
+		"tlou":         "The Last of Us",
+		"gow3":         "God of War III",
+		"gow 3":        "God of War III",
+		"gow":          "God of War",
+		"re4":          "Resident Evil 4",
+		"re2":          "Resident Evil 2",
+		"re3":          "Resident Evil 3",
+		"re7":          "Resident Evil 7",
+		"re8":          "Resident Evil Village",
+		"sb":           "Stellar Blade",
+		"onimushawots": "Onimusha: Way of the Sword",
+		"goofy":        "Goofy Gorillas",
+		"darkest":      "Darkest Dungeon",
 	}
 	if expanded, ok := acronymMap[tLow]; ok {
+		return expanded
+	}
+	if expanded, ok := acronymMap[noSpaces]; ok {
 		return expanded
 	}
 	return title
@@ -1301,6 +1311,7 @@ func isOnlineLiveServiceGame(name string, appID string, path string) bool {
 		"escape from tarkov",
 		"pubg",
 		"overwatch",
+		"nikke", "goddess of victory", "com.proximabeta",
 	}
 
 	for _, kw := range onlineKeywords {
@@ -1459,7 +1470,8 @@ func scanSteamUserdata(games *[]DetectedGame, seen map[string]bool) {
 				if err != nil || aIDNum <= 0 {
 					continue
 				}
-				if appID == "7" || appID == "760" {
+				// 7: Steam Community, 760: Steam Screenshots, 241100: Steam Controller / Input Configs
+				if appID == "7" || appID == "760" || appID == "241100" {
 					continue
 				}
 
@@ -1789,9 +1801,9 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 				// Check local ini for AppID / ProjectName
 				iniAppID, iniProject := extractUnrealConfigMeta(gameFolder)
 				appID := iniAppID
-				cleanName := name
+				cleanName := cleanGameTitle(name)
 				if iniProject != "" {
-					cleanName = iniProject
+					cleanName = cleanGameTitle(iniProject)
 				}
 
 				// Check known project codenames (HighMoon -> Evil West, Pagoda -> Dead as Disco)
@@ -2565,7 +2577,7 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 							seen[canonical] = true
 							seen[pePath] = true
 							appID, iconURL, protonTier := resolveAppIDByName(peName)
-							cleanName := peName
+							cleanName := cleanGameTitle(peName)
 							if appID != "" {
 								cleanName = getGameName(appID, cleanName)
 							}
@@ -2613,7 +2625,7 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 				seen[canonical] = true
 				seen[subPath] = true
 				appID, iconURL, protonTier := resolveAppIDByName(name)
-				cleanName := name
+				cleanName := cleanGameTitle(name)
 				if appID != "" {
 					cleanName = getGameName(appID, cleanName)
 				}
@@ -3674,6 +3686,12 @@ var knownOnlineGames = []struct {
 		Status:     "Running",
 		AntiCheats: []string{"HoYoverse AC"},
 		Signatures: []string{`Honkai: Star Rail`, `Star Rail`},
+	},
+	{
+		Name:       "GODDESS OF VICTORY: NIKKE",
+		Status:     "Running",
+		AntiCheats: []string{"Anti-Cheat Expert (ACE)"},
+		Signatures: []string{`NIKKE`, `com.proximabeta`},
 	},
 	{
 		Name:       "Brawlhalla",
