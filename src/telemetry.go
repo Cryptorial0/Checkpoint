@@ -99,7 +99,7 @@ func DispatchTelemetryReport(games []DetectedGame, onlineGames []OnlineGame) {
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("User-Agent", "Checkpoint-Telemetry/0.9")
+		req.Header.Set("User-Agent", "Checkpoint-Telemetry/0.9.1")
 
 		resp, err := client.Do(req)
 		if err == nil {
