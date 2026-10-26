@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p dist
           cd src
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ../dist/checkpoint.exe .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o ../dist/checkpoint.exe .
           cd ..
 
       - name: Build Linux ELF Binary
@@ -75,8 +75,8 @@ jobs:
 
           curl -sL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o /tmp/appimagetool
           chmod +x /tmp/appimagetool
-          sed -i 's|AI\x02|\x00\x00\x00|' /tmp/appimagetool || true
-          /tmp/appimagetool --appimage-extract-and-run AppDir "dist/checkpoint-${TAG_NAME}.AppImage"
+          (cd /tmp && ./appimagetool --appimage-extract)
+          ARCH=x86_64 /tmp/squashfs-root/AppRun AppDir "dist/checkpoint-${TAG_NAME}.AppImage"
 
       - name: Generate Checksums
         run: |
