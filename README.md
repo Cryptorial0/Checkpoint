@@ -29,10 +29,10 @@ Pre-built binaries for **Release 0.9 (Beta)**:
 | **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.9-beta/checkpoint.exe) |
 
 > [!NOTE]
-> All binary artifacts and checksums are published on the [GitHub Releases](https://github.com/Cryptorial0/Checkpoint/releases) page.
+> All binary artifacts and checksums are published on the [GitHub Releases](https://github.com/Cryptorial0/Checkpoint/releases) page. Free code signing provided by the [SignPath Foundation](https://signpath.org).
 
 > [!TIP]
-> **Windows Users:** On first run, Windows Defender SmartScreen may display an *"Unrecognized app"* warning. Click **"More info"** → **"Run anyway"**. This happens because Checkpoint is a new, independent open-source tool without an expensive commercial code-signing certificate.
+> **Windows Executable Verification:** Official Windows releases of Checkpoint are signed using free code signing provided by the [SignPath Foundation](https://signpath.org). Checkpoint is open-source software; see [PRIVACY.md](PRIVACY.md) for our privacy policy.
 
 ## Usage
 
