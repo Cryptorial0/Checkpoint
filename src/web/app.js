@@ -1948,16 +1948,20 @@ function escapeHtml(str) {
 async function initTelemetryUI() {
   const modal = document.getElementById("telemetry-modal");
   const chkShare = document.getElementById("chk-telemetry-share");
+  const chkShareRestore = document.getElementById("chk-telemetry-share-restore");
   const btnAllow = document.getElementById("btn-telemetry-allow");
   const btnDeny = document.getElementById("btn-telemetry-deny");
+
+  const syncCheckboxes = (enabled) => {
+    if (chkShare) chkShare.checked = enabled;
+    if (chkShareRestore) chkShareRestore.checked = enabled;
+  };
 
   try {
     const res = await fetch("/api/telemetry/status");
     if (res.ok) {
       const data = await res.json();
-      if (chkShare) {
-        chkShare.checked = !!data.enabled;
-      }
+      syncCheckboxes(!!data.enabled);
       if (!data.prompted && modal) {
         modal.classList.remove("hidden");
       }
@@ -1969,7 +1973,7 @@ async function initTelemetryUI() {
   if (btnAllow) {
     btnAllow.addEventListener("click", async () => {
       if (modal) modal.classList.add("hidden");
-      if (chkShare) chkShare.checked = true;
+      syncCheckboxes(true);
       try {
         await fetch("/api/telemetry/set", {
           method: "POST",
@@ -1984,7 +1988,7 @@ async function initTelemetryUI() {
   if (btnDeny) {
     btnDeny.addEventListener("click", async () => {
       if (modal) modal.classList.add("hidden");
-      if (chkShare) chkShare.checked = false;
+      syncCheckboxes(false);
       try {
         await fetch("/api/telemetry/set", {
           method: "POST",
@@ -1996,17 +2000,23 @@ async function initTelemetryUI() {
     });
   }
 
+  const handleCheckboxToggle = async (val) => {
+    syncCheckboxes(val);
+    try {
+      await fetch("/api/telemetry/set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: val })
+      });
+      log(`Anonymous detection reports ${val ? "enabled" : "disabled"}.`);
+    } catch (e) {}
+  };
+
   if (chkShare) {
-    chkShare.addEventListener("change", async () => {
-      try {
-        await fetch("/api/telemetry/set", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ enabled: chkShare.checked })
-        });
-        log(`Anonymous detection reports ${chkShare.checked ? "enabled" : "disabled"}.`);
-      } catch (e) {}
-    });
+    chkShare.addEventListener("change", () => handleCheckboxToggle(chkShare.checked));
+  }
+  if (chkShareRestore) {
+    chkShareRestore.addEventListener("change", () => handleCheckboxToggle(chkShareRestore.checked));
   }
 }
 

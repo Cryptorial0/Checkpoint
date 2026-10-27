@@ -56,7 +56,7 @@ type ExportReportRequest struct {
 
 func main() {
 	InitLogger()
-	Log("Checkpoint starting up (v0.10.0 Beta)...")
+	Log("Checkpoint starting up (v0.10.1 Beta)...")
 
 	versionFlag := flag.Bool("v", false, "Show version and exit")
 	versionLongFlag := flag.Bool("version", false, "Show version and exit")
@@ -67,7 +67,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag || *versionLongFlag {
-		fmt.Println("Checkpoint v0.10.0 Beta")
+		fmt.Println("Checkpoint v0.10.1 Beta")
 		return
 	}
 
@@ -475,6 +475,7 @@ func main() {
 			writeJSON(w, map[string]string{"error": err.Error()})
 			return
 		}
+		DispatchRestoreTelemetryReport(manifest, "inspect")
 		writeJSON(w, manifest)
 	})
 
@@ -490,6 +491,7 @@ func main() {
 		}
 
 		var reports []RestoreReport
+		var restoredGames []GameSaveMeta
 		total := len(req.Tasks)
 		SetProgress("restore", 0, "Starting restore process...", 0, total, "")
 		for i, task := range req.Tasks {
@@ -503,8 +505,16 @@ func main() {
 
 			rep := RestoreGame(req.SourcePath, task.Meta, task.CustomDir)
 			reports = append(reports, rep)
+			if rep.Success {
+				restoredGames = append(restoredGames, task.Meta)
+			}
 		}
 		SetProgress("idle", 100, "Restore complete.", total, total, "")
+
+		if len(restoredGames) > 0 {
+			DispatchRestoreTelemetryReport(&VaultManifest{Games: restoredGames}, "restore")
+		}
+
 		writeJSON(w, reports)
 	})
 
@@ -635,7 +645,7 @@ func launchAppWindow(url string) {
 
 func runCLIRestore(vaultPath string, auto bool) {
 	fmt.Println("=======================================================")
-	fmt.Println(" SAVE MIGRATOR - LINUX RESTORER [CLI]")
+	fmt.Println(" CHECKPOINT - LINUX RESTORER [CLI]")
 	fmt.Println("=======================================================")
 	fmt.Printf("Inspecting vault: %s\n", vaultPath)
 
@@ -644,6 +654,7 @@ func runCLIRestore(vaultPath string, auto bool) {
 		fmt.Printf("Error opening vault: %v\n", err)
 		return
 	}
+	DispatchRestoreTelemetryReport(manifest, "cli_inspect")
 
 	fmt.Printf("Loaded vault with %d game save(s), created at %s\n\n", len(manifest.Games), manifest.CreatedAt)
 
@@ -699,12 +710,16 @@ func runCLIRestore(vaultPath string, auto bool) {
 		}
 	}
 
+	if successCount > 0 {
+		DispatchRestoreTelemetryReport(manifest, "cli_restore")
+	}
+
 	fmt.Printf("\nRestore complete: %d of %d games restored successfully.\n", successCount, resolvableCount)
 }
 
 func runCLI() {
 	fmt.Println("=======================================================")
-	fmt.Println(" SAVE MIGRATOR v0.5.9.5 [BETA TEST BUILD]")
+	fmt.Println(" CHECKPOINT v0.9 [BETA]")
 	fmt.Println("=======================================================")
 	fmt.Println("Notice: Early preview build. Verify saves before wiping.")
 	fmt.Println()
@@ -869,11 +884,46 @@ func (c *AppConfig) GetLocation(gameID, appID, gameName string) (SavedLocation, 
 }
 
 func getConfigPath() string {
-	execPath, err := os.Executable()
-	if err == nil {
-		return filepath.Join(filepath.Dir(execPath), "save_migrator_config.json")
+	if runtime.GOOS != "windows" {
+		homeDir, err := os.UserHomeDir()
+		if err == nil && homeDir != "" {
+			cfgDir := filepath.Join(homeDir, ".config", "checkpoint")
+			_ = os.MkdirAll(cfgDir, 0755)
+			newPath := filepath.Join(cfgDir, "config.json")
+			// Migrate legacy configs if newPath doesn't exist yet
+			if _, statErr := os.Stat(newPath); os.IsNotExist(statErr) {
+				legacyPaths := []string{
+					filepath.Join(homeDir, ".config", "save-migrator", "config.json"),
+					"checkpoint_config.json",
+					"save_migrator_config.json",
+				}
+				for _, lp := range legacyPaths {
+					if data, readErr := os.ReadFile(lp); readErr == nil {
+						_ = os.WriteFile(newPath, data, 0644)
+						break
+					}
+				}
+			}
+			return newPath
+		}
+	} else {
+		// Portable mode test on Windows: check if exe folder is writable
+		if execPath, err := os.Executable(); err == nil {
+			dir := filepath.Dir(execPath)
+			testFile := filepath.Join(dir, ".chk_wtest")
+			if err := os.WriteFile(testFile, []byte("ok"), 0644); err == nil {
+				_ = os.Remove(testFile)
+				return filepath.Join(dir, "checkpoint_config.json")
+			}
+		}
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			cfgDir := filepath.Join(appData, "Checkpoint")
+			_ = os.MkdirAll(cfgDir, 0755)
+			return filepath.Join(cfgDir, "config.json")
+		}
 	}
-	return "save_migrator_config.json"
+
+	return "checkpoint_config.json"
 }
 
 func LoadConfig() AppConfig {
@@ -895,6 +945,9 @@ func LoadConfig() AppConfig {
 
 func SaveConfig(cfg AppConfig) error {
 	cfgPath := getConfigPath()
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0755); err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
