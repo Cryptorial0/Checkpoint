@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"strings"
@@ -659,7 +661,7 @@ func TestSakoEdenAndShadPS4(t *testing.T) {
 	foundBloodborne := false
 	for _, g := range detected {
 		t.Logf(" - [%s] %s (Storage: %s, Rel: %s, Files: %d)", g.ID, g.Name, g.StorageType, g.TargetRelativePath, g.FileCount)
-		if g.ID == "emu_eden" {
+		if g.ID == "emu_eden" || strings.HasPrefix(g.ID, "switch_eden") {
 			foundEden = true
 		}
 		if g.ID == "ps4_cusa00900" {
@@ -714,5 +716,86 @@ func TestTelemetryFindings(t *testing.T) {
 		if id == "1446780" && isFiltered {
 			t.Errorf("AppID %s should not be filtered", id)
 		}
+	}
+}
+
+func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
+	// 1. Switch Title ID resolution
+	if !isSwitchTitleID("010019A01E2F2000") {
+		t.Errorf("Expected 010019A01E2F2000 to be recognized as valid Switch Title ID")
+	}
+	if switchTitleMap["010019a01e2f2000"] != "Metroid Prime 4: Beyond" {
+		t.Errorf("Expected Metroid Prime 4: Beyond in switchTitleMap")
+	}
+	if switchTitleMap["0100f2c0115b6000"] != "The Legend of Zelda: Tears of the Kingdom" {
+		t.Errorf("Expected Tears of the Kingdom in switchTitleMap")
+	}
+
+	// 2. Binary SFO Parser test
+	var sfoBuf bytes.Buffer
+	sfoBuf.WriteString("\x00PSF")
+	binary.Write(&sfoBuf, binary.LittleEndian, uint32(0x00000101))
+	keyOffset := uint32(0x24)
+	binary.Write(&sfoBuf, binary.LittleEndian, keyOffset)
+	dataOffset := uint32(0x40)
+	binary.Write(&sfoBuf, binary.LittleEndian, dataOffset)
+	binary.Write(&sfoBuf, binary.LittleEndian, uint32(1))
+	binary.Write(&sfoBuf, binary.LittleEndian, uint16(0))
+	binary.Write(&sfoBuf, binary.LittleEndian, uint16(0x0204))
+	binary.Write(&sfoBuf, binary.LittleEndian, uint32(12))
+	binary.Write(&sfoBuf, binary.LittleEndian, uint32(128))
+	binary.Write(&sfoBuf, binary.LittleEndian, uint32(0))
+
+	for sfoBuf.Len() < int(keyOffset) {
+		sfoBuf.WriteByte(0)
+	}
+	sfoBuf.WriteString("TITLE\x00")
+
+	for sfoBuf.Len() < int(dataOffset) {
+		sfoBuf.WriteByte(0)
+	}
+	sfoBuf.WriteString("Bloodborne\x00\x00")
+
+	info := parseSFOData(sfoBuf.Bytes())
+	if info.Title != "Bloodborne" {
+		t.Errorf("Expected parsed SFO Title 'Bloodborne', got '%s'", info.Title)
+	}
+
+	// 3. EmuDeck restorer target resolution
+	tmpHome, err := os.MkdirTemp("", "emudeck_home_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp home: %v", err)
+	}
+	defer os.RemoveAll(tmpHome)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	emuDeckCemu := filepath.Join(tmpHome, "Emulation", "saves", "cemu")
+	os.MkdirAll(emuDeckCemu, 0755)
+
+	cemuMeta := GameSaveMeta{
+		ID:                 "cemu_00050000_101c9500",
+		GameName:           "The Legend of Zelda: Breath of the Wild",
+		StorageType:          "Wii U Emulator",
+		TargetRelativePath: "cemu/mlc01/usr/save/00050000/101c9500",
+	}
+
+	path, label := LocateConsoleEmulatorPath(cemuMeta)
+	if path != emuDeckCemu {
+		t.Errorf("Expected EmuDeck Cemu path %s, got %s", emuDeckCemu, path)
+	}
+	if !strings.Contains(label, "EmuDeck") {
+		t.Errorf("Expected EmuDeck in label, got %s", label)
+	}
+
+	targetPath, status, _, _ := AutoLocateLinuxTarget(cemuMeta)
+	if status != "emulator_detected" {
+		t.Errorf("Expected emulator_detected status, got %s", status)
+	}
+	expectedTarget := filepath.Join(emuDeckCemu, "mlc01", "usr", "save", "00050000", "101c9500")
+	if targetPath != expectedTarget {
+		t.Errorf("Expected stripped target %s, got %s", expectedTarget, targetPath)
 	}
 }

@@ -11,22 +11,22 @@
 <p align="center">
   <a href="https://ko-fi.com/cryptorial"><img src="https://img.shields.io/badge/Support%20on%20Ko--fi-2ea043?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" alt="License: GPL v3"></a>
-  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v0.9.2%20Beta-00d2aa?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v0.10.0%20Beta-00d2aa?style=for-the-badge" alt="Release"></a>
 </p>
 
 Migration tool for PC game saves, offline Steam emulators, and console memory cards. Discovers where your games store progress, packages them into a portable vault archive, and restores them directly into the correct Wine and Proton prefixes on Linux.
 
 Launches a standalone desktop interface on Linux or drops into a command line interface for headless scripts.
 
-## Releases & Downloads (v0.9.2 Beta)
+## Releases & Downloads (v0.10.0 Beta)
 
-Pre-built binaries for **Release 0.9.2 (Beta)**:
+Pre-built binaries for **Release 0.10.0 (Beta)**:
 
 | Platform | Package | Description | Binary |
 | :--- | :--- | :--- | :--- |
-| **Linux** | **AppImage** | Standalone portable bundle (runs on all Linux distributions) | [checkpoint-v0.9.2-beta.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.9.2-beta/checkpoint-v0.9.2-beta.AppImage) |
-| **Linux** | **Binary** | Native 64-bit ELF executable | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.9.2-beta/checkpoint) |
-| **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.9.2-beta/checkpoint.exe) |
+| **Linux** | **AppImage** | Standalone portable bundle (runs on all Linux distributions) | [checkpoint-v0.10.0-beta.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.10.0-beta/checkpoint-v0.10.0-beta.AppImage) |
+| **Linux** | **Binary** | Native 64-bit ELF executable | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.10.0-beta/checkpoint) |
+| **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.10.0-beta/checkpoint.exe) |
 
 > [!NOTE]
 > All binary artifacts and checksums are published on the [GitHub Releases](https://github.com/Cryptorial0/Checkpoint/releases) page. 
@@ -107,7 +107,7 @@ Detects installed online multiplayer games with server-side progress and display
 
 ## Roadmap
 
-- **v0.9.2 Beta (Current):** Standalone desktop application for Linux and Windows, automatic prefix detection, Steam userdata scanner, safe overwrite backups, anonymous diagnostic telemetry, and anti-cheat database refinements.
+- **v0.10.0 Beta (Current):** Standalone desktop application, EmuDeck & RetroDECK integration, Sony PARAM.SFO binary parser, Nintendo Switch TitleID resolution, automatic prefix detection, safe overwrite backups, anonymous telemetry, and anti-cheat checks.
 - **v1.0:** Polished interface, bug fixes, and stable public release.
 - **After 1.0 (Any OS to Any OS):** Full bidirectional cross-OS migration. Backup from any supported OS (Windows, Linux, SteamOS) and restore to any supported OS.
 
