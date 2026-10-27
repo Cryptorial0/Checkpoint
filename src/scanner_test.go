@@ -799,3 +799,104 @@ func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
 		t.Errorf("Expected stripped target %s, got %s", expectedTarget, targetPath)
 	}
 }
+
+func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
+	// 1. Unreal Engine Codenames
+	testCodenames := map[string]struct {
+		expectedID   string
+		expectedName string
+	}{
+		"Phoenix":    {"990080", "Hogwarts Legacy"},
+		"Oregon":     {"1583230", "High On Life"},
+		"BlueClient": {"2456740", "inZOI"},
+		"Chameleon":  {"4704690", "MECCHA CHAMELEON"},
+	}
+
+	for codename, expected := range testCodenames {
+		appID, name := resolveUnrealProjectCodename(codename)
+		if appID != expected.expectedID || name != expected.expectedName {
+			t.Errorf("Codename %s: expected (%s, %s), got (%s, %s)",
+				codename, expected.expectedID, expected.expectedName, appID, name)
+		}
+	}
+
+	// 2. Title cleaning & normalization
+	if got := cleanGameTitle("Beyond Two Souls Steam"); got != "Beyond Two Souls" {
+		t.Errorf("Expected 'Beyond Two Souls', got '%s'", got)
+	}
+	if got := cleanGameTitle("The Walking Dead - Definitive Series"); got != "The Walking Dead Definitive Series" {
+		t.Errorf("Expected 'The Walking Dead Definitive Series', got '%s'", got)
+	}
+
+	// 3. Known AppIDs and delisted games
+	if name := getGameName("224060", ""); name != "Deadpool" {
+		t.Errorf("Expected 'Deadpool' for AppID 224060, got '%s'", name)
+	}
+	if name := getGameName("2420110", ""); name != "Horizon Forbidden West Complete Edition" {
+		t.Errorf("Expected 'Horizon Forbidden West Complete Edition' for AppID 2420110, got '%s'", name)
+	}
+
+	// 4. LocalLow Mock scanning
+	tmpRoot, err := os.MkdirTemp("", "locallow_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpRoot)
+
+	// Create directories
+	os.MkdirAll(filepath.Join(tmpRoot, "webviewdata", "2"), 0755)
+	os.WriteFile(filepath.Join(tmpRoot, "webviewdata", "2", "cache.dat"), []byte("junk"), 0644)
+
+	os.MkdirAll(filepath.Join(tmpRoot, "DefaultCompany", "Mirror"), 0755)
+	os.WriteFile(filepath.Join(tmpRoot, "DefaultCompany", "Mirror", "save.dat"), []byte("save"), 0644)
+
+	os.MkdirAll(filepath.Join(tmpRoot, "Gryphline", "Endfield"), 0755)
+	os.WriteFile(filepath.Join(tmpRoot, "Gryphline", "Endfield", "save.dat"), []byte("save"), 0644)
+
+	os.MkdirAll(filepath.Join(tmpRoot, "ILLGAMES", "HoneyCome"), 0755)
+	os.WriteFile(filepath.Join(tmpRoot, "ILLGAMES", "HoneyCome", "save.dat"), []byte("save"), 0644)
+
+	os.MkdirAll(filepath.Join(tmpRoot, "Landfall West", "Stick Fight_ The Game"), 0755)
+	os.WriteFile(filepath.Join(tmpRoot, "Landfall West", "Stick Fight_ The Game", "save.dat"), []byte("save"), 0644)
+
+	var detected []DetectedGame
+	seen := make(map[string]bool)
+	scanUserAppDataLocalLow(tmpRoot, &detected, seen)
+
+	foundMirror := false
+	foundEndfield := false
+	foundHoneyCome := false
+	foundStickFight := false
+
+	for _, g := range detected {
+		if strings.Contains(g.SourcePath, "webviewdata") {
+			t.Errorf("False positive: webviewdata should be ignored!")
+		}
+		if g.Name == "Mirror" {
+			foundMirror = true
+		}
+		if strings.Contains(g.Name, "Endfield") {
+			foundEndfield = true
+		}
+		if strings.Contains(g.Name, "HoneyCome") {
+			foundHoneyCome = true
+		}
+		if strings.Contains(g.Name, "Stick Fight") {
+			foundStickFight = true
+		}
+	}
+
+	if !foundMirror {
+		t.Errorf("Expected Mirror to be detected under DefaultCompany")
+	}
+	if !foundEndfield {
+		t.Errorf("Expected Arknights: Endfield to be detected under Gryphline")
+	}
+	if !foundHoneyCome {
+		t.Errorf("Expected HoneyCome to be detected under ILLGAMES")
+	}
+	if !foundStickFight {
+		t.Errorf("Expected Stick Fight: The Game to be detected under Landfall West")
+	}
+}
+
