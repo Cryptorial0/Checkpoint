@@ -1950,24 +1950,11 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 func scanAppDataEmulators(appData string, games *[]DetectedGame, seen map[string]bool) {
 	// Ryujinx (Switch)
 	ryuSave := filepath.Join(appData, "Ryujinx", "bis", "user", "save")
-	if stat, err := os.Stat(ryuSave); err == nil && stat.IsDir() && !seen[ryuSave] {
-		count, size := getDirStats(ryuSave)
-		if count > 0 {
-			seen[ryuSave] = true
-			*games = append(*games, DetectedGame{
-				ID:                 "emu_ryujinx",
-				Name:               "Nintendo Switch Saves (Ryujinx)",
-				SaveType:           SaveTypeInTree,
-				StorageType:          "Switch Emulator",
-				SourcePath:         ryuSave,
-				TargetRelativePath: "Ryujinx/bis/user/save",
-				FileCount:          count,
-				SizeBytes:          size,
-			})
-		}
+	if stat, err := os.Stat(ryuSave); err == nil && stat.IsDir() {
+		scanSwitchEmuDir(ryuSave, "Ryujinx", "Ryujinx/bis/user/save", games, seen)
 	}
 
-	// Switch Emulators (Ryujinx, Yuzu, Suyu, Eden, Sudachi, Torzu, Citron)
+	// Switch Emulators (yuzu, suyu, eden, sudachi, torzu, citron)
 	switchEmus := []string{"yuzu", "suyu", "eden", "sudachi", "torzu", "citron"}
 	localAppData := os.Getenv("LOCALAPPDATA")
 
@@ -1979,23 +1966,8 @@ func scanAppDataEmulators(appData string, games *[]DetectedGame, seen map[string
 			candidates = append(candidates, filepath.Join(localAppData, emuName, "nand", "user", "save"))
 		}
 		for _, emuSave := range candidates {
-			canonical := strings.ToLower(filepath.Clean(emuSave))
-			if stat, err := os.Stat(emuSave); err == nil && stat.IsDir() && !seen[canonical] && !seen[emuSave] {
-				count, size := getDirStats(emuSave)
-				if count > 0 {
-					seen[canonical] = true
-					seen[emuSave] = true
-					*games = append(*games, DetectedGame{
-						ID:                 "emu_" + emuName,
-						Name:               fmt.Sprintf("Nintendo Switch Saves (%s)", strings.Title(emuName)),
-						SaveType:           SaveTypeInTree,
-						StorageType:          "Switch Emulator",
-						SourcePath:         emuSave,
-						TargetRelativePath: emuName + "/nand/user/save",
-						FileCount:          count,
-						SizeBytes:          size,
-					})
-				}
+			if stat, err := os.Stat(emuSave); err == nil && stat.IsDir() {
+				scanSwitchEmuDir(emuSave, emuName, emuName+"/nand/user/save", games, seen)
 			}
 		}
 	}
@@ -2143,6 +2115,9 @@ func scanCemuSaves(cemuSaveDir, relBase string, games *[]DetectedGame, seen map[
 			}
 
 			metaXML := filepath.Join(gameDir, "meta", "meta.xml")
+			if _, err := os.Stat(metaXML); err != nil {
+				metaXML = filepath.Join(gameDir, "meta.xml")
+			}
 			parsedTitle := parseCemuTitleName(metaXML)
 			displayName := parsedTitle
 			if displayName == "" {
@@ -2211,7 +2186,8 @@ func scanRPCS3Home(homeDir string, games *[]DetectedGame, seen map[string]bool) 
 			}
 			seen[gameDir] = true
 			titleID := e.Name()
-			gameName := extractPARAMSFOTitle(filepath.Join(gameDir, "PARAM.SFO"))
+			sfoInfo := extractSFOFromDir(gameDir)
+			gameName := sfoInfo.Title
 			if gameName == "" {
 				gameName = "PS3 Save (" + titleID + ")"
 			}
@@ -2229,25 +2205,273 @@ func scanRPCS3Home(homeDir string, games *[]DetectedGame, seen map[string]bool) 
 	}
 }
 
-func extractPARAMSFOTitle(sfoPath string) string {
-	data, err := os.ReadFile(sfoPath)
-	if err != nil || len(data) < 20 {
-		return ""
+// SFOInfo contains parsed metadata from Sony PARAM.SFO files
+type SFOInfo struct {
+	Title    string
+	SubTitle string
+	TitleID  string
+}
+
+func parseSFOData(data []byte) SFOInfo {
+	var info SFOInfo
+	if len(data) < 20 {
+		return info
 	}
-	idx := bytes.Index(data, []byte("TITLE\x00"))
-	if idx == -1 {
-		return ""
-	}
-	// Locate clean printable string after title header in SFO data table
-	sub := data[idx:]
-	parts := bytes.Split(sub, []byte{0})
-	for _, p := range parts {
-		trimmed := strings.TrimSpace(string(p))
-		if len(trimmed) >= 3 && trimmed != "TITLE" && isASCIIPrintable(trimmed) {
-			return trimmed
+
+	// 1. Check standard Sony SFO header: "\x00PSF"
+	if string(data[:4]) == "\x00PSF" {
+		keyTableStart := binary.LittleEndian.Uint32(data[8:12])
+		dataTableStart := binary.LittleEndian.Uint32(data[12:16])
+		numEntries := binary.LittleEndian.Uint32(data[16:20])
+
+		pos := 20
+		for i := uint32(0); i < numEntries; i++ {
+			if pos+16 > len(data) {
+				break
+			}
+			keyOffset := uint32(binary.LittleEndian.Uint16(data[pos : pos+2]))
+			paramLen := binary.LittleEndian.Uint32(data[pos+4 : pos+8])
+			dataOffset := binary.LittleEndian.Uint32(data[pos+12 : pos+16])
+			pos += 16
+
+			kStart := keyTableStart + keyOffset
+			if kStart >= uint32(len(data)) {
+				continue
+			}
+			kEnd := kStart
+			for kEnd < uint32(len(data)) && data[kEnd] != 0 {
+				kEnd++
+			}
+			key := string(data[kStart:kEnd])
+
+			dStart := dataTableStart + dataOffset
+			dEnd := dStart + paramLen
+			if dEnd > uint32(len(data)) {
+				dEnd = uint32(len(data))
+			}
+			if dStart < dEnd {
+				valBytes := data[dStart:dEnd]
+				for len(valBytes) > 0 && valBytes[len(valBytes)-1] == 0 {
+					valBytes = valBytes[:len(valBytes)-1]
+				}
+				val := strings.TrimSpace(string(valBytes))
+				switch key {
+				case "TITLE":
+					if info.Title == "" {
+						info.Title = val
+					}
+				case "MAINTITLE":
+					info.Title = val
+				case "SUB_TITLE":
+					info.SubTitle = val
+				case "TITLE_ID":
+					info.TitleID = val
+				}
+			}
 		}
 	}
+
+	// 2. Fallback heuristic for mock/truncated test SFO files
+	if info.Title == "" {
+		idx := bytes.Index(data, []byte("TITLE\x00"))
+		if idx != -1 {
+			sub := data[idx:]
+			parts := bytes.Split(sub, []byte{0})
+			for _, p := range parts {
+				trimmed := strings.TrimSpace(string(p))
+				if len(trimmed) >= 3 && trimmed != "TITLE" && isASCIIPrintable(trimmed) {
+					info.Title = trimmed
+					break
+				}
+			}
+		}
+	}
+
+	// Clean save suffixes from title
+	if info.Title != "" {
+		info.Title = strings.TrimSuffix(info.Title, " SaveData")
+		info.Title = strings.TrimSuffix(info.Title, " Savedata")
+		info.Title = strings.TrimSuffix(info.Title, " Save Data")
+		info.Title = strings.TrimSpace(info.Title)
+	}
+
+	return info
+}
+
+func extractSFOFromDir(saveDir string) SFOInfo {
+	candidates := []string{
+		filepath.Join(saveDir, "PARAM.SFO"),
+		filepath.Join(saveDir, "param.sfo"),
+		filepath.Join(saveDir, "sce_sys", "param.sfo"),
+		filepath.Join(saveDir, "sce_sys", "PARAM.SFO"),
+	}
+	for _, cand := range candidates {
+		if data, err := os.ReadFile(cand); err == nil && len(data) >= 20 {
+			info := parseSFOData(data)
+			if info.Title != "" || info.TitleID != "" {
+				return info
+			}
+		}
+	}
+
+	var found SFOInfo
+	_ = filepath.Walk(saveDir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil || fi.IsDir() {
+			return nil
+		}
+		if strings.EqualFold(fi.Name(), "param.sfo") {
+			if data, err := os.ReadFile(path); err == nil && len(data) >= 20 {
+				info := parseSFOData(data)
+				if info.Title != "" || info.TitleID != "" {
+					found = info
+					return filepath.SkipAll
+				}
+			}
+		}
+		return nil
+	})
+	return found
+}
+
+func extractPARAMSFOTitle(sfoPath string) string {
+	if data, err := os.ReadFile(sfoPath); err == nil {
+		info := parseSFOData(data)
+		return info.Title
+	}
 	return ""
+}
+
+var switchTitleMap = map[string]string{
+	"0100000000010000": "Super Mario Odyssey",
+	"0100152000022000": "Super Smash Bros. Ultimate",
+	"01007ef00011e000": "The Legend of Zelda: Breath of the Wild",
+	"0100f2c0115b6000": "The Legend of Zelda: Tears of the Kingdom",
+	"010019a01e2f2000": "Metroid Prime 4: Beyond",
+	"01003da00af1c000": "Metroid Dread",
+	"0100121014688000": "Metroid Prime Remastered",
+	"0100030003340000": "Mario Kart 8 Deluxe",
+	"01006f8002326000": "Animal Crossing: New Horizons",
+	"0100abf008968000": "Pokémon Sword",
+	"01008db008c2c000": "Pokémon Shield",
+	"0100a3d008c5c000": "Pokémon Scarlet",
+	"01008f6008c5e000": "Pokémon Violet",
+	"01001f5010dcc000": "Pokémon Legends: Arceus",
+	"0100e95004038000": "Luigi's Mansion 3",
+	"010028600ebda000": "Super Mario 3D World + Bowser's Fury",
+	"01002b8011ec8000": "Super Mario Bros. Wonder",
+	"0100519009e50000": "Paper Mario: The Origami King",
+	"0100d070104ac000": "Paper Mario: The Thousand-Year Door",
+	"0100c9a00ece6000": "Kirby and the Forgotten Land",
+	"010074600570a000": "Xenoblade Chronicles: Definitive Edition",
+	"0100e95004038001": "Xenoblade Chronicles 2",
+	"010074600570a001": "Xenoblade Chronicles 3",
+	"0100f9f00c696000": "Fire Emblem: Three Houses",
+	"0100c9c016768000": "Fire Emblem Engage",
+	"0100f2c0115b6001": "Bayonetta 3",
+	"01004ab00b8c8000": "Bayonetta Origins: Cereza and the Lost Demon",
+	"010086900af7c000": "Astral Chain",
+	"0100000000020000": "ARMS",
+	"0100000000030000": "Splatoon 2",
+	"0100c2500fc20000": "Splatoon 3",
+	"01009aa000faa000": "Donkey Kong Country: Tropical Freeze",
+	"0100257008714000": "Pikmin 4",
+	"01006a800016e000": "Super Smash Bros.",
+	"0100bc000dd08000": "The Legend of Zelda: Echoes of Wisdom",
+	"01006bb00c30e000": "The Legend of Zelda: Link's Awakening",
+	"0100a6f004568000": "Dragon Quest XI S: Echoes of an Elusive Age",
+	"01008320081f2000": "Persona 5 Royal",
+	"01007bf016140000": "Persona 4 Golden",
+	"0100e4e01613e000": "Persona 3 Portable",
+	"0100b70014798000": "Shin Megami Tensei V: Vengeance",
+	"01005a90100e6000": "Unicorn Overlord",
+	"01007ef00011e001": "The Legend of Zelda: Skyward Sword HD",
+}
+
+func isSwitchTitleID(name string) bool {
+	if len(name) != 16 {
+		return false
+	}
+	low := strings.ToLower(name)
+	if !strings.HasPrefix(low, "0100") {
+		return false
+	}
+	for _, r := range low {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+func scanSwitchEmuDir(saveRoot, emuName, relBase string, games *[]DetectedGame, seen map[string]bool) {
+	if stat, err := os.Stat(saveRoot); err != nil || !stat.IsDir() {
+		return
+	}
+
+	foundTitles := false
+	_ = filepath.Walk(saveRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			name := strings.ToLower(info.Name())
+			if isSwitchTitleID(name) {
+				count, size := getDirStats(path)
+				if count > 0 {
+					canonical := strings.ToLower(filepath.Clean(path))
+					if !seen[canonical] && !seen[path] {
+						seen[canonical] = true
+						seen[path] = true
+						foundTitles = true
+
+						titleName := switchTitleMap[name]
+						if titleName == "" {
+							titleName = fmt.Sprintf("Switch Title (%s)", strings.ToUpper(name))
+						}
+
+						relPath, rErr := filepath.Rel(saveRoot, path)
+						if rErr != nil {
+							relPath = name
+						}
+
+						*games = append(*games, DetectedGame{
+							ID:                 fmt.Sprintf("switch_%s_%s", strings.ToLower(emuName), name),
+							Name:               fmt.Sprintf("%s (%s)", titleName, strings.Title(emuName)),
+							SaveType:           SaveTypeInTree,
+							StorageType:          "Switch Emulator",
+							SourcePath:         path,
+							TargetRelativePath: filepath.ToSlash(filepath.Join(relBase, relPath)),
+							FileCount:          count,
+							SizeBytes:          size,
+						})
+						return filepath.SkipDir
+					}
+				}
+			}
+		}
+		return nil
+	})
+
+	if !foundTitles {
+		canonical := strings.ToLower(filepath.Clean(saveRoot))
+		if !seen[canonical] && !seen[saveRoot] {
+			count, size := getDirStats(saveRoot)
+			if count > 0 {
+				seen[canonical] = true
+				seen[saveRoot] = true
+				*games = append(*games, DetectedGame{
+					ID:                 "emu_" + strings.ToLower(emuName),
+					Name:               fmt.Sprintf("Nintendo Switch Saves (%s)", strings.Title(emuName)),
+					SaveType:           SaveTypeInTree,
+					StorageType:          "Switch Emulator",
+					SourcePath:         saveRoot,
+					TargetRelativePath: filepath.ToSlash(relBase),
+					FileCount:          count,
+					SizeBytes:          size,
+				})
+			}
+		}
+	}
 }
 
 func isASCIIPrintable(s string) bool {
@@ -3079,12 +3303,11 @@ func addPS4Game(saveDir, gameFolder, titleID string, games *[]DetectedGame, seen
 
 	titleIDUpper := strings.ToUpper(titleID)
 	baseGameName := ps4TitleMap[titleIDUpper]
-	if baseGameName == "" {
-		if sfoTitle := extractPS4TitleFromSFO(saveDir); sfoTitle != "" {
-			baseGameName = sfoTitle
-		} else {
-			baseGameName = "PS4 Title (" + titleIDUpper + ")"
-		}
+	sfoInfo := extractSFOFromDir(saveDir)
+	if sfoInfo.Title != "" {
+		baseGameName = sfoInfo.Title
+	} else if baseGameName == "" {
+		baseGameName = "PS4 Title (" + titleIDUpper + ")"
 	}
 	displayName := baseGameName + " (PS4 Emulator / bbport)"
 
