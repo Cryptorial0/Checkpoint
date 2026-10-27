@@ -88,6 +88,17 @@ var knownAppIDs = map[string]string{
 	"252490":  "Rust",
 	"374320":  "DARK SOULS III",
 	"814380":  "Sekiro: Shadows Die Twice",
+	"224060":  "Deadpool",
+	"2420110": "Horizon Forbidden West Complete Edition",
+	"1449690": "The Walking Dead: The Telltale Definitive Series",
+	"960990":  "Beyond: Two Souls",
+	"271590":  "Grand Theft Auto V",
+	"3974650": "Onimusha: Way of the Sword Demo",
+	"2543370": "HoneyCome come come party",
+	"4732690": "Arknights: Endfield",
+	"674940":  "Stick Fight: The Game",
+	"4704690": "MECCHA CHAMELEON",
+	"644560":  "Mirror",
 }
 
 func initCache() {
@@ -529,6 +540,7 @@ func resolveAppIDByName(rawTitle string) (appID, iconURL, protonTier string) {
 	// Fallback for notable delisted Steam games
 	delistedGames := map[string]string{
 		"rocket league": "252950",
+		"deadpool":      "224060",
 	}
 	if did, ok := delistedGames[strings.ToLower(cleanTitle)]; ok {
 		return did, getSteamIconURL(did), fetchProtonDBTier(did)
@@ -721,6 +733,14 @@ func resolveUnrealProjectCodename(folderName string) (appID string, gameName str
 		return "2437390", "Enginefall"
 	case "sb":
 		return "3489700", "Stellar Blade"
+	case "phoenix":
+		return "990080", "Hogwarts Legacy"
+	case "oregon":
+		return "1583230", "High On Life"
+	case "blueclient":
+		return "2456740", "inZOI"
+	case "chameleon":
+		return "4704690", "MECCHA CHAMELEON"
 	}
 	return "", ""
 }
@@ -950,12 +970,13 @@ func expandGamingAcronyms(title string) string {
 func cleanGameTitle(raw string) string {
 	clean := raw
 	clean = strings.NewReplacer("™", "", "®", "", "©", "").Replace(clean)
-	suffixes := []string{" Game", " Client", " Release", "_Data", "-Win64-Shipping", "Win64"}
+	suffixes := []string{" Game", " Client", " Release", "_Data", "-Win64-Shipping", "Win64", " Steam", " Demo"}
 	for _, s := range suffixes {
 		clean = strings.TrimSuffix(clean, s)
 	}
 	clean = strings.ReplaceAll(clean, "_", " ")
 	clean = strings.ReplaceAll(clean, "-", " ")
+	clean = strings.Join(strings.Fields(clean), " ")
 	if !strings.Contains(clean, " ") {
 		clean = splitCamelCase(clean)
 	}
@@ -1654,6 +1675,9 @@ func scanUserAppDataLocalLow(localLow string, games *[]DetectedGame, seen map[st
 		"ime":                  true,
 		"internet explorer":    true,
 		"dxcache":              true,
+		"webviewdata":          true,
+		"cef":                  true,
+		"chromium":             true,
 	}
 
 	for _, c := range companyEntries {
@@ -1701,8 +1725,20 @@ func scanUserAppDataLocalLow(localLow string, games *[]DetectedGame, seen map[st
 			}
 
 			cleanName := gName
+			cleanName = strings.ReplaceAll(cleanName, "_ ", ": ")
+			cleanName = strings.ReplaceAll(cleanName, "_", " ")
+			cleanName = strings.Join(strings.Fields(cleanName), " ")
 			if strings.EqualFold(cleanName, "MiSideFull") {
 				cleanName = "MiSide"
+			}
+			if cLow == "defaultcompany" && strings.EqualFold(gLow, "mirror") {
+				cleanName = "Mirror"
+			}
+			if cLow == "gryphline" && strings.EqualFold(gLow, "endfield") {
+				cleanName = "Arknights: Endfield"
+			}
+			if cLow == "illgames" && strings.EqualFold(gLow, "honeycome") {
+				cleanName = "HoneyCome"
 			}
 
 			appID, iconURL, protonTier := resolveAppIDByName(cleanName)
