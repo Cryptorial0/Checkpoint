@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"encoding/xml"
@@ -741,6 +742,20 @@ func resolveUnrealProjectCodename(folderName string) (appID string, gameName str
 		return "2456740", "inZOI"
 	case "chameleon":
 		return "4704690", "MECCHA CHAMELEON"
+	case "factorygame":
+		return "526870", "Satisfactory"
+	case "bbq":
+		return "1433140", "The Texas Chain Saw Massacre"
+	case "shf":
+		return "", "Silent Hill f"
+	case "fnaf_sotm", "fnafsotm":
+		return "", "Five Nights at Freddy's: Secret of the Mimic"
+	case "pendriverpro":
+		return "", "Pen Driver Pro"
+	case "endofabyss":
+		return "", "End of Abyss"
+	case "partyengine":
+		return "1887840", "Another Crab's Treasure"
 	}
 	return "", ""
 }
@@ -1678,6 +1693,8 @@ func scanUserAppDataLocalLow(localLow string, games *[]DetectedGame, seen map[st
 		"webviewdata":          true,
 		"cef":                  true,
 		"chromium":             true,
+		"adobe":                true,
+		"growthsdk":            true,
 	}
 
 	for _, c := range companyEntries {
@@ -1739,6 +1756,12 @@ func scanUserAppDataLocalLow(localLow string, games *[]DetectedGame, seen map[st
 			}
 			if cLow == "illgames" && strings.EqualFold(gLow, "honeycome") {
 				cleanName = "HoneyCome"
+			}
+			if cLow == "aggro crab" && strings.EqualFold(gLow, "partyengine") {
+				cleanName = "Another Crab's Treasure"
+			}
+			if cLow == "numinous games" && strings.HasPrefix(gLow, "that dragon") {
+				cleanName = "That Dragon, Cancer"
 			}
 
 			appID, iconURL, protonTier := resolveAppIDByName(cleanName)
@@ -2227,15 +2250,22 @@ func scanRPCS3Home(homeDir string, games *[]DetectedGame, seen map[string]bool) 
 			if gameName == "" {
 				gameName = "PS3 Save (" + titleID + ")"
 			}
+			appID, iconURL, protonTier := resolveAppIDByName(gameName)
+			if iconURL == "" {
+				iconURL = extractLocalSaveIcon(gameDir)
+			}
 			*games = append(*games, DetectedGame{
 				ID:                 "rpcs3_" + strings.ToLower(titleID),
 				Name:               gameName,
+				AppID:              appID,
 				SaveType:           SaveTypeInTree,
-				StorageType:          "PS3 Emulator (RPCS3)",
+				StorageType:        "PS3 Emulator (RPCS3)",
 				SourcePath:         gameDir,
 				TargetRelativePath: filepath.ToSlash(filepath.Join("RPCS3", "dev_hdd0", "home", u.Name(), "savedata", titleID)),
 				FileCount:          count,
 				SizeBytes:          size,
+				IconURL:            iconURL,
+				ProtonTier:         protonTier,
 			})
 		}
 	}
@@ -2369,6 +2399,38 @@ func extractSFOFromDir(saveDir string) SFOInfo {
 	return found
 }
 
+func extractLocalSaveIcon(saveDir string) string {
+	candidates := []string{
+		filepath.Join(saveDir, "sce_sys", "icon0.png"),
+		filepath.Join(saveDir, "sce_sys", "ICON0.PNG"),
+		filepath.Join(saveDir, "icon0.png"),
+		filepath.Join(saveDir, "ICON0.PNG"),
+		filepath.Join(saveDir, "__thumbnail.png"),
+	}
+
+	for _, c := range candidates {
+		if data, err := os.ReadFile(c); err == nil && len(data) > 0 && len(data) <= 500*1024 {
+			return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data)
+		}
+	}
+
+	var found string
+	_ = filepath.Walk(saveDir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil || fi.IsDir() || found != "" {
+			return nil
+		}
+		low := strings.ToLower(fi.Name())
+		if low == "icon0.png" || low == "__thumbnail.png" {
+			if data, err := os.ReadFile(path); err == nil && len(data) > 0 && len(data) <= 500*1024 {
+				found = "data:image/png;base64," + base64.StdEncoding.EncodeToString(data)
+				return filepath.SkipAll
+			}
+		}
+		return nil
+	})
+	return found
+}
+
 func extractPARAMSFOTitle(sfoPath string) string {
 	if data, err := os.ReadFile(sfoPath); err == nil {
 		info := parseSFOData(data)
@@ -2403,8 +2465,12 @@ var switchTitleMap = map[string]string{
 	"010074600570a001": "Xenoblade Chronicles 3",
 	"0100f9f00c696000": "Fire Emblem: Three Houses",
 	"0100c9c016768000": "Fire Emblem Engage",
+	"0100a6301214e000": "Fire Emblem Engage",
 	"0100f2c0115b6001": "Bayonetta 3",
+	"01004a4010fea000": "Bayonetta 3",
 	"01004ab00b8c8000": "Bayonetta Origins: Cereza and the Lost Demon",
+	"01004d300c5ae000": "Kirby and the Forgotten Land",
+	"010099c022b96000": "Super Mario 3D All-Stars",
 	"010086900af7c000": "Astral Chain",
 	"0100000000020000": "ARMS",
 	"0100000000030000": "Splatoon 2",
@@ -2421,6 +2487,55 @@ var switchTitleMap = map[string]string{
 	"0100b70014798000": "Shin Megami Tensei V: Vengeance",
 	"01005a90100e6000": "Unicorn Overlord",
 	"01007ef00011e001": "The Legend of Zelda: Skyward Sword HD",
+}
+
+var switchExclusiveArt = map[string]string{
+	"01006a800016e000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000012332/ac4d1fc9824876ce756406f0525d50c57ded4b2a666f6fed40a69ae3e19c001c",
+	"0100f2c0115b6000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000063714/25293291eb58223d7790b50e32865ecdfca39a7b75fcf5fa51e9b6bd52538cb9",
+	"0100000000010000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000000025/7137262b5a64d921e193653f8aa0b732925ad22645f8415e432c9c79299ab6ff",
+	"01007ef00011e000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000001130/c42553b4fd0312c31e70ec001a77993d37fb9d673687b147bc31479bd29298c5",
+	"0100152000022000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000000153/de697f487a36d74db93fa17dbcf297f642674e2d26f6343513a94396f4c405bc",
+	"01006f8002326000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000027619/99ba42617f694669fcf78e7ebcf04e90df935be06c71c4c9273c5cf896c21e64",
+	"0100a3d008c5c000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000053968/66e04d4444a7bb3ae87010a30b77b78ab5a78280f339f40fa4477484439c1d04",
+	"01008f6008c5e000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000053973/60a221f705b0be229a43a051d9571b742b66a5b467ecbc7fa155e7fc239f80a4",
+	"01001f5010dda000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000039947/7968bc507c3cc17dfc4e40243beaa1c3cf14a1a3683f12ee56ad1128362612a4",
+	"010093801237c000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000042924/8c93de8e79c6bb264560ea3d085600c0f9947703fd563e488d5e80aaad81ef12",
+	"01004d300c5ae000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000046399/1a4731c238e925927514a3622ceae75f78cba9a613271f28df11634c07d3b5e4",
+	"01004a4010fea000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000046404/691d5cb0c74fbff06e25ce6813bfec0dbadcb3f28328c0b29ff100781eecae89",
+	"0100f2c0115b6001": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000046404/691d5cb0c74fbff06e25ce6813bfec0dbadcb3f28328c0b29ff100781eecae89",
+	"0100c9c016768000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000057404/b8ae4c4aef53bc30a7d976bebe05eb8035bc87ec49987cfbe2ee677bf1fbcaaa",
+	"0100a6301214e000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000057404/b8ae4c4aef53bc30a7d976bebe05eb8035bc87ec49987cfbe2ee677bf1fbcaaa",
+	"010099c022b96000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000033442/de7a9926fa8e938ee9ba840b2f0a5eeff645e7774900ce7a1f59265f956557fb",
+	"0100bc000dd08000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000084591/8c2eb5fbbca31d5b0d014bc1e06e3e5bc3524b077a16e91f16ff36dc323c2162",
+	"01006bb00c30e000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000020033/8cb8452ef8928c0c451675a8a6cefc2d74488db9f90240974fa2e1a49f57ebfa",
+	"0100257008714000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000005470/7e32431aa7d01804c86ec00beea9bb64426b38cff06e23aa3a7585bfdfb06460",
+	"0100c2500fc20000": "https://assets.nintendo.com/image/upload/ar_16:9,c_lpad,w_656/b_white/f_auto/q_auto/ncom/software/switch/70010000046372/2916ee64ee4a03c0048e788bc5fbb5ebc40217983ea1909a1bf1dfd93540eb40",
+}
+
+var xboxTitleMap = map[string]string{
+	"545408a7": "Red Dead Redemption",
+	"545408a0": "Grand Theft Auto IV",
+	"545408a2": "Grand Theft Auto V",
+	"4541088f": "Skate 3",
+	"4d5307e6": "Halo 3",
+	"4d53085b": "Halo: Reach",
+	"4d530919": "Halo 4",
+	"4d5307e4": "Gears of War 2",
+	"4d5308ab": "Gears of War 3",
+	"4d530856": "Fable II",
+	"4d5308d6": "Fable III",
+	"4541080f": "Burnout Revenge",
+	"45410972": "Fight Night Champion",
+	"425307d5": "Lost Odyssey",
+	"4d5307df": "Blue Dragon",
+	"434307de": "Dragon's Dogma",
+	"4e4d07f6": "Armored Core: For Answer",
+	"4b4e0818": "Soulcalibur IV",
+	"4b4e083d": "Tekken 6",
+}
+
+func getXboxTitleName(titleID string) string {
+	return xboxTitleMap[strings.ToLower(titleID)]
 }
 
 func isSwitchTitleID(name string) bool {
@@ -2470,15 +2585,23 @@ func scanSwitchEmuDir(saveRoot, emuName, relBase string, games *[]DetectedGame, 
 							relPath = name
 						}
 
+						appID, iconURL, protonTier := resolveAppIDByName(titleName)
+						if iconURL == "" {
+							iconURL = switchExclusiveArt[name]
+						}
+
 						*games = append(*games, DetectedGame{
 							ID:                 fmt.Sprintf("switch_%s_%s", strings.ToLower(emuName), name),
 							Name:               fmt.Sprintf("%s (%s)", titleName, strings.Title(emuName)),
+							AppID:              appID,
 							SaveType:           SaveTypeInTree,
-							StorageType:          "Switch Emulator",
+							StorageType:        "Switch Emulator",
 							SourcePath:         path,
 							TargetRelativePath: filepath.ToSlash(filepath.Join(relBase, relPath)),
 							FileCount:          count,
 							SizeBytes:          size,
+							IconURL:            iconURL,
+							ProtonTier:         protonTier,
 						})
 						return filepath.SkipDir
 					}
@@ -2559,59 +2682,89 @@ func scanDocumentsEmulators(games *[]DetectedGame, seen map[string]bool) {
 	}
 
 	// DuckStation (PS1 Memcards)
-	duckMem := filepath.Join(docsDir, "DuckStation", "memcards")
-	if stat, err := os.Stat(duckMem); err == nil && stat.IsDir() && !seen[duckMem] {
-		count, size := getDirStats(duckMem)
-		if count > 0 {
-			seen[duckMem] = true
-			*games = append(*games, DetectedGame{
-				ID:                 "emu_duckstation",
-				Name:               "PlayStation 1 Memory Cards (DuckStation)",
-				SaveType:           SaveTypeInTree,
-				StorageType:          "PS1 Emulator",
-				SourcePath:         duckMem,
-				TargetRelativePath: "duckstation/memcards",
-				FileCount:          count,
-				SizeBytes:          size,
-			})
+	duckDirs := []string{
+		filepath.Join(docsDir, "DuckStation", "memcards"),
+	}
+	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {
+		duckDirs = append(duckDirs, filepath.Join(localApp, "DuckStation", "memcards"))
+	}
+	if appData := os.Getenv("APPDATA"); appData != "" {
+		duckDirs = append(duckDirs, filepath.Join(appData, "DuckStation", "memcards"))
+	}
+	for _, duckMem := range duckDirs {
+		if stat, err := os.Stat(duckMem); err == nil && stat.IsDir() && !seen[duckMem] {
+			count, size := getDirStats(duckMem)
+			if count > 0 {
+				seen[duckMem] = true
+				*games = append(*games, DetectedGame{
+					ID:                 "emu_duckstation",
+					Name:               "PlayStation 1 Memory Cards (DuckStation)",
+					SaveType:           SaveTypeInTree,
+					StorageType:        "PS1 Emulator",
+					SourcePath:         duckMem,
+					TargetRelativePath: "duckstation/memcards",
+					FileCount:          count,
+					SizeBytes:          size,
+				})
+			}
 		}
 	}
 
 	// Dolphin (GameCube / Wii)
-	dolphinUser := filepath.Join(docsDir, "Dolphin Emulator", "GC")
-	if stat, err := os.Stat(dolphinUser); err == nil && stat.IsDir() && !seen[dolphinUser] {
-		count, size := getDirStats(dolphinUser)
-		if count > 0 {
-			seen[dolphinUser] = true
-			*games = append(*games, DetectedGame{
-				ID:                 "emu_dolphin",
-				Name:               "GameCube & Wii Saves (Dolphin)",
-				SaveType:           SaveTypeInTree,
-				StorageType:          "Wii/GC Emulator",
-				SourcePath:         dolphinUser,
-				TargetRelativePath: "dolphin-emu/GC",
-				FileCount:          count,
-				SizeBytes:          size,
-			})
+	dolphinDirs := []string{
+		filepath.Join(docsDir, "Dolphin Emulator", "GC"),
+	}
+	if appData := os.Getenv("APPDATA"); appData != "" {
+		dolphinDirs = append(dolphinDirs, filepath.Join(appData, "Dolphin Emulator", "GC"))
+	}
+	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {
+		dolphinDirs = append(dolphinDirs, filepath.Join(localApp, "Dolphin Emulator", "GC"))
+	}
+	for _, dolphinUser := range dolphinDirs {
+		if stat, err := os.Stat(dolphinUser); err == nil && stat.IsDir() && !seen[dolphinUser] {
+			count, size := getDirStats(dolphinUser)
+			if count > 0 {
+				seen[dolphinUser] = true
+				*games = append(*games, DetectedGame{
+					ID:                 "emu_dolphin",
+					Name:               "GameCube & Wii Saves (Dolphin)",
+					SaveType:           SaveTypeInTree,
+					StorageType:        "Wii/GC Emulator",
+					SourcePath:         dolphinUser,
+					TargetRelativePath: "dolphin-emu/GC",
+					FileCount:          count,
+					SizeBytes:          size,
+				})
+			}
 		}
 	}
 
 	// Xenia (Xbox 360)
-	xeniaContent := filepath.Join(docsDir, "Xenia", "content")
-	if stat, err := os.Stat(xeniaContent); err == nil && stat.IsDir() && !seen[xeniaContent] {
-		count, size := getDirStats(xeniaContent)
-		if count > 0 {
-			seen[xeniaContent] = true
-			*games = append(*games, DetectedGame{
-				ID:                 "emu_xenia",
-				Name:               "Xbox 360 Saves (Xenia)",
-				SaveType:           SaveTypeInTree,
-				StorageType:          "Xbox 360 Emulator",
-				SourcePath:         xeniaContent,
-				TargetRelativePath: "xenia/content",
-				FileCount:          count,
-				SizeBytes:          size,
-			})
+	xeniaDirs := []string{
+		filepath.Join(docsDir, "Xenia", "content"),
+	}
+	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {
+		xeniaDirs = append(xeniaDirs, filepath.Join(localApp, "Xenia", "content"))
+	}
+	if appData := os.Getenv("APPDATA"); appData != "" {
+		xeniaDirs = append(xeniaDirs, filepath.Join(appData, "Xenia", "content"))
+	}
+	for _, xeniaContent := range xeniaDirs {
+		if stat, err := os.Stat(xeniaContent); err == nil && stat.IsDir() && !seen[xeniaContent] {
+			count, size := getDirStats(xeniaContent)
+			if count > 0 {
+				seen[xeniaContent] = true
+				*games = append(*games, DetectedGame{
+					ID:                 "emu_xenia",
+					Name:               "Xbox 360 Saves (Xenia)",
+					SaveType:           SaveTypeInTree,
+					StorageType:        "Xbox 360 Emulator",
+					SourcePath:         xeniaContent,
+					TargetRelativePath: "xenia/content",
+					FileCount:          count,
+					SizeBytes:          size,
+				})
+			}
 		}
 	}
 }
@@ -2750,6 +2903,8 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 		"bandicam":                true,
 		"backup":                  true,
 		"backups":                 true,
+		"modmanager":              true,
+		"mod manager":             true,
 		"temp":                    true,
 		"tmp":                     true,
 		"downloads":               true,
@@ -3352,6 +3507,9 @@ func addPS4Game(saveDir, gameFolder, titleID string, games *[]DetectedGame, seen
 		relPath = filepath.Join("savedata", titleIDUpper)
 	}
 	appID, iconURL, protonTier := resolveAppIDByName(baseGameName)
+	if iconURL == "" {
+		iconURL = extractLocalSaveIcon(saveDir)
+	}
 
 	*games = append(*games, DetectedGame{
 		ID:                 "ps4_" + strings.ToLower(titleIDUpper),
@@ -3543,22 +3701,69 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 		}
 
 		// Portable Xenia (Xbox 360)
-		if stat, err := os.Stat(filepath.Join(gameFolder, "content", "0000000000000000")); err == nil && stat.IsDir() {
-			pSave := filepath.Join(gameFolder, "content")
-			if !seen[pSave] {
-				count, size := getDirStats(pSave)
-				if count > 0 {
-					seen[pSave] = true
-					*games = append(*games, DetectedGame{
-						ID:                 "emu_xenia_portable_" + sanitizeID(entry.Name()),
-						Name:               fmt.Sprintf("Xbox 360 Saves (Xenia - %s)", entry.Name()),
-						SaveType:           SaveTypeInTree,
-						StorageType:          "Xbox 360 Emulator",
-						SourcePath:         pSave,
-						TargetRelativePath: filepath.ToSlash(filepath.Join(entry.Name(), "content")),
-						FileCount:          count,
-						SizeBytes:          size,
-					})
+		contentDir := filepath.Join(gameFolder, "content")
+		if stat, err := os.Stat(contentDir); err == nil && stat.IsDir() {
+			profEntries, err := os.ReadDir(contentDir)
+			if err == nil {
+				foundTitles := false
+				for _, p := range profEntries {
+					if !p.IsDir() {
+						continue
+					}
+					profPath := filepath.Join(contentDir, p.Name())
+					titleEntries, tErr := os.ReadDir(profPath)
+					if tErr != nil {
+						continue
+					}
+					for _, t := range titleEntries {
+						if !t.IsDir() {
+							continue
+						}
+						titleDir := filepath.Join(profPath, t.Name())
+						count, size := getDirStats(titleDir)
+						if count > 0 && !seen[titleDir] {
+							seen[titleDir] = true
+							foundTitles = true
+							titleID := t.Name()
+							gameName := getXboxTitleName(titleID)
+							if gameName == "" {
+								gameName = fmt.Sprintf("Xbox 360 Title (%s)", strings.ToUpper(titleID))
+							}
+							appID, iconURL, protonTier := resolveAppIDByName(gameName)
+							if iconURL == "" {
+								iconURL = extractLocalSaveIcon(titleDir)
+							}
+							*games = append(*games, DetectedGame{
+								ID:                 fmt.Sprintf("xenia_%s_%s", strings.ToLower(p.Name()), strings.ToLower(titleID)),
+								Name:               fmt.Sprintf("%s (Xenia)", gameName),
+								AppID:              appID,
+								SaveType:           SaveTypeInTree,
+								StorageType:        "Xbox 360 Emulator (Xenia)",
+								SourcePath:         titleDir,
+								TargetRelativePath: filepath.ToSlash(filepath.Join(entry.Name(), "content", p.Name(), titleID)),
+								FileCount:          count,
+								SizeBytes:          size,
+								IconURL:            iconURL,
+								ProtonTier:         protonTier,
+							})
+						}
+					}
+				}
+				if !foundTitles && !seen[contentDir] {
+					count, size := getDirStats(contentDir)
+					if count > 0 {
+						seen[contentDir] = true
+						*games = append(*games, DetectedGame{
+							ID:                 "emu_xenia_portable_" + sanitizeID(entry.Name()),
+							Name:               fmt.Sprintf("Xbox 360 Saves (Xenia - %s)", entry.Name()),
+							SaveType:           SaveTypeInTree,
+							StorageType:        "Xbox 360 Emulator",
+							SourcePath:         contentDir,
+							TargetRelativePath: filepath.ToSlash(filepath.Join(entry.Name(), "content")),
+							FileCount:          count,
+							SizeBytes:          size,
+						})
+					}
 				}
 			}
 		}

@@ -900,3 +900,58 @@ func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
 	}
 }
 
+func TestV0110EmulatorAndArtworkFeatures(t *testing.T) {
+	// 1. Unreal Engine Telemetry Codenames
+	fAppID, fName := resolveUnrealProjectCodename("FactoryGame")
+	if fAppID != "526870" || fName != "Satisfactory" {
+		t.Errorf("Expected Satisfactory (526870), got %s (%s)", fName, fAppID)
+	}
+
+	bbqAppID, bbqName := resolveUnrealProjectCodename("BBQ")
+	if bbqAppID != "1433140" || bbqName != "The Texas Chain Saw Massacre" {
+		t.Errorf("Expected The Texas Chain Saw Massacre (1433140), got %s (%s)", bbqName, bbqAppID)
+	}
+
+	_, shfName := resolveUnrealProjectCodename("SHf")
+	if shfName != "Silent Hill f" {
+		t.Errorf("Expected Silent Hill f, got %s", shfName)
+	}
+
+	// 2. Switch title ID mappings & artwork
+	if name := switchTitleMap["01004a4010fea000"]; name != "Bayonetta 3" {
+		t.Errorf("Expected Bayonetta 3, got '%s'", name)
+	}
+	if name := switchTitleMap["01004d300c5ae000"]; name != "Kirby and the Forgotten Land" {
+		t.Errorf("Expected Kirby and the Forgotten Land, got '%s'", name)
+	}
+	if art := switchExclusiveArt["01006a800016e000"]; !strings.HasPrefix(art, "http") {
+		t.Errorf("Expected valid art URL for Smash Bros, got '%s'", art)
+	}
+
+	// 3. Local console save icon extraction (icon0.png)
+	tmpDir, err := os.MkdirTemp("", "save_art_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	sceSysDir := filepath.Join(tmpDir, "sce_sys")
+	os.MkdirAll(sceSysDir, 0755)
+	dummyPNG := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
+	os.WriteFile(filepath.Join(sceSysDir, "icon0.png"), dummyPNG, 0644)
+
+	extracted := extractLocalSaveIcon(tmpDir)
+	if !strings.HasPrefix(extracted, "data:image/png;base64,") {
+		t.Errorf("Expected data URI base64 icon, got '%s'", extracted)
+	}
+
+	// 4. Xbox 360 Title Mapping
+	if title := getXboxTitleName("545408A7"); title != "Red Dead Redemption" {
+		t.Errorf("Expected Red Dead Redemption, got '%s'", title)
+	}
+	if title := getXboxTitleName("4541088f"); title != "Skate 3" {
+		t.Errorf("Expected Skate 3, got '%s'", title)
+	}
+}
+
+

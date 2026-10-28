@@ -165,7 +165,7 @@ func runNativeWindowsGUI() {
 
 	procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
 
-	title := syscall.StringToUTF16Ptr("Checkpoint (Beta v0.10.1)")
+	title := syscall.StringToUTF16Ptr("Checkpoint (Beta v0.11.0)")
 	hMainWnd, _, _ = procCreateWindowExW.Call(
 		0,
 		uintptr(unsafe.Pointer(className)),
@@ -221,7 +221,7 @@ func createChildControls(parent, hInstance uintptr) {
 	}
 
 	// 1. Beta Banner & Web UI Link
-	makeControl(staticClass, "Checkpoint: Game Save & Emulator Migration (Beta v0.10.1)", 0, 20, 15, 450, 20, 0)
+	makeControl(staticClass, "Checkpoint: Game Save & Emulator Migration (Beta v0.11.0)", 0, 20, 15, 450, 20, 0)
 	hBtnOpenWeb = makeControl(btnClass, "Open Web Dashboard", BS_PUSHBUTTON|WS_TABSTOP, 480, 12, 330, 26, ID_BTN_OPEN_WEB)
 
 	// 2. System Safety Group
