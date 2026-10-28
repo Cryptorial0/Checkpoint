@@ -538,10 +538,15 @@ func resolveAppIDByName(rawTitle string) (appID, iconURL, protonTier string) {
 		}
 	}
 
-	// Fallback for notable delisted Steam games
+	// Fallback for notable delisted Steam games or title aliases
 	delistedGames := map[string]string{
-		"rocket league": "252950",
-		"deadpool":      "224060",
+		"rocket league":                      "252950",
+		"deadpool":                           "224060",
+		"gtav enhanced":                      "271590",
+		"gta v enhanced":                     "271590",
+		"the walking dead definitive series": "1449690",
+		"the last of us part ii":             "2531310",
+		"the last of us part 2":              "2531310",
 	}
 	if did, ok := delistedGames[strings.ToLower(cleanTitle)]; ok {
 		return did, getSteamIconURL(did), fetchProtonDBTier(did)
@@ -948,18 +953,20 @@ func expandGamingAcronyms(title string) string {
 	tLow := strings.ToLower(strings.TrimSpace(title))
 	noSpaces := strings.ReplaceAll(tLow, " ", "")
 	acronymMap := map[string]string{
-		"gtav":         "Grand Theft Auto V",
-		"gta v":        "Grand Theft Auto V",
-		"gta5":         "Grand Theft Auto 5",
-		"gta 5":        "Grand Theft Auto 5",
-		"gtaiv":        "Grand Theft Auto IV",
-		"gta iv":       "Grand Theft Auto IV",
-		"gta4":         "Grand Theft Auto 4",
-		"gta 4":        "Grand Theft Auto 4",
-		"gta":          "Grand Theft Auto",
-		"tlou2":        "The Last of Us Part II",
-		"tlou 2":       "The Last of Us Part II",
-		"tlou":         "The Last of Us",
+		"gtav":                              "Grand Theft Auto V",
+		"gta v":                             "Grand Theft Auto V",
+		"gtav enhanced":                     "Grand Theft Auto V",
+		"gta v enhanced":                    "Grand Theft Auto V",
+		"gta5":                              "Grand Theft Auto 5",
+		"gta 5":                             "Grand Theft Auto 5",
+		"gtaiv":                             "Grand Theft Auto IV",
+		"gta iv":                            "Grand Theft Auto IV",
+		"gta4":                              "Grand Theft Auto 4",
+		"gta 4":                             "Grand Theft Auto 4",
+		"gta":                               "Grand Theft Auto",
+		"tlou2":                  "The Last of Us Part II",
+		"tlou 2":                 "The Last of Us Part II",
+		"tlou":                   "The Last of Us",
 		"gow3":         "God of War III",
 		"gow 3":        "God of War III",
 		"gow":          "God of War",
