@@ -307,6 +307,20 @@ func TestStudioCorrelationAndStrictMatching(t *testing.T) {
 	if matchedDisc != "" {
 		t.Errorf("Expected Discovery to have no machine correlation, got %s", matchedDisc)
 	}
+
+	// Emulator names do NOT falsely correlate to publishers like PlayStation or Xbox
+	fetchSteamMetadata("3489700") // Stellar Blade (PlayStation Publishing LLC)
+	fetchSteamMetadata("2627260") // NINJA GAIDEN 4 (Xbox Game Studios)
+
+	falsePS2 := findAppIDByDeveloperOrStudio("PlayStation 2 Memory Cards (PCSX2)", []string{"3489700", "2627260"})
+	if falsePS2 != "" {
+		t.Errorf("False positive: PCSX2 correlated to AppID %s!", falsePS2)
+	}
+
+	falseDolphin := findAppIDByDeveloperOrStudio("GameCube & Wii Saves (Dolphin)", []string{"3489700", "2627260"})
+	if falseDolphin != "" {
+		t.Errorf("False positive: Dolphin correlated to AppID %s!", falseDolphin)
+	}
 }
 
 func TestDynamicSteamLibraryDiscovery(t *testing.T) {

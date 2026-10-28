@@ -819,6 +819,15 @@ func findAppIDByMachineCorrelation(folderName string, detectedGames []DetectedGa
 	appDevelopersCacheMu.RLock()
 	defer appDevelopersCacheMu.RUnlock()
 
+	ignoredStudioTokens := map[string]bool{
+		"game": true, "games": true, "studio": true, "studios": true,
+		"entertainment": true, "interactive": true, "publishing": true,
+		"corporation": true, "corp": true, "company": true, "co": true,
+		"inc": true, "ltd": true, "llc": true, "team": true, "the": true,
+		"playstation": true, "xbox": true, "nintendo": true, "valve": true,
+		"software": true, "digital": true, "media": true, "productions": true,
+	}
+
 	for _, g := range detectedGames {
 		if g.AppID == "" {
 			continue
@@ -829,12 +838,15 @@ func findAppIDByMachineCorrelation(folderName string, detectedGames []DetectedGa
 		}
 		for _, dev := range devs {
 			devLow := strings.ToLower(dev)
-			if strings.Contains(devLow, fLow) || strings.Contains(fLow, devLow) {
+			if devLow == fLow {
 				return g.AppID
 			}
 			for _, word := range strings.Fields(devLow) {
-				if len(word) >= 4 && (word == fLow || strings.HasPrefix(word, fLow) || strings.HasPrefix(fLow, word)) {
-					return g.AppID
+				cleanWord := strings.Trim(word, ",.-_()[]\"'")
+				if len(cleanWord) >= 4 && !ignoredStudioTokens[cleanWord] {
+					if cleanWord == fLow {
+						return g.AppID
+					}
 				}
 			}
 		}
@@ -1129,6 +1141,10 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 	for i := range games {
 		g := &games[i]
 		if g.AppID == "" {
+			// Skip console emulators and system memory cards from studio correlation
+			if strings.Contains(g.StorageType, "Emulator") || strings.HasPrefix(g.ID, "emu_") {
+				continue
+			}
 			codeAppID, codeName := findAppIDByInstalledGameFolder(g.Name)
 			if codeAppID != "" {
 				g.AppID = codeAppID
