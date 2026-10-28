@@ -56,7 +56,7 @@ type ExportReportRequest struct {
 
 func main() {
 	InitLogger()
-	Log("Checkpoint starting up (v0.11.0 Beta)...")
+	Log("Checkpoint starting up (v1.0.0)...")
 
 	versionFlag := flag.Bool("v", false, "Show version and exit")
 	versionLongFlag := flag.Bool("version", false, "Show version and exit")
@@ -67,7 +67,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag || *versionLongFlag {
-		fmt.Println("Checkpoint v0.11.0 Beta")
+		fmt.Println("Checkpoint v1.0.0")
 		return
 	}
 

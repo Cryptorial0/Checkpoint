@@ -5,28 +5,28 @@
 <h1 align="center">Checkpoint</h1>
 
 <p align="center">
-  <strong>Fast, secure game save backup & migration between Windows and Linux / Steam Deck.</strong>
+  <strong>Fast, secure game save backup & migration across Windows and Linux / Steam Deck.</strong>
 </p>
 
 <p align="center">
   <a href="https://ko-fi.com/cryptorial"><img src="https://img.shields.io/badge/Support%20on%20Ko--fi-2ea043?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" alt="License: GPL v3"></a>
-  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v0.11.0%20Beta-00d2aa?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v1.0.0-00d2aa?style=for-the-badge" alt="Release"></a>
 </p>
 
-Migration tool for PC game saves, offline Steam emulators, and console memory cards. Discovers where your games store progress, packages them into a portable vault archive, and restores them directly into the correct Wine and Proton prefixes on Linux.
+Migration tool for PC game saves, offline Steam emulators, and console memory cards. Discovers where your games store progress, packages them into a portable vault archive, and seamlessly restores them across any OS (Windows ⇄ Windows, Windows ⇄ Linux, Linux ⇄ Linux) into the correct folders, Wine prefixes, and Proton prefixes.
 
-Launches a standalone desktop interface on Linux or drops into a command line interface for headless scripts.
+Launches a standalone desktop interface on Windows and Linux, or drops into a command line interface for headless scripts.
 
-## Releases & Downloads (v0.11.0 Beta)
+## Releases & Downloads (v1.0.0)
 
-Pre-built binaries for **Release 0.11.0 (Beta)**:
+Pre-built binaries for **Release 1.0.0**:
 
 | Platform | Package | Description | Binary |
 | :--- | :--- | :--- | :--- |
-| **Linux** | **AppImage** | Standalone portable bundle (runs on all Linux distributions) | [checkpoint-v0.11.0-beta.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.11.0-beta/checkpoint-v0.11.0-beta.AppImage) |
-| **Linux** | **Binary** | Native 64-bit ELF executable | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.11.0-beta/checkpoint) |
-| **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v0.11.0-beta/checkpoint.exe) |
+| **Linux** | **AppImage** | Standalone portable bundle (runs on all Linux distributions) | [checkpoint-v1.0.0.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.0.0/checkpoint-v1.0.0.AppImage) |
+| **Linux** | **Binary** | Native 64-bit ELF executable | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.0.0/checkpoint) |
+| **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.0.0/checkpoint.exe) |
 
 > [!NOTE]
 > All binary artifacts and checksums are published on the [GitHub Releases](https://github.com/Cryptorial0/Checkpoint/releases) page. 
@@ -105,11 +105,16 @@ Detects installed online multiplayer games with server-side progress and display
 - Filesystem Casing Resolver: Linux filesystems (ext4, btrfs) are case-sensitive while Windows is not. Checkpoint walks destination directories case-insensitively so save files land in the folders games expect without manual renaming.
 - Steam Cloud Timestamp Protection: Updates modified timestamps during restore to prevent Steam Cloud from overwriting your restored saves with older cloud files when launching a game for the first time.
 
-## Roadmap
+## Release Highlights
 
-- **v0.11.0 Beta (Current):** Standalone desktop application, expanded emulator paths (DuckStation, Dolphin, portable Xenia, ShadPS4 slots), authentic local save icon extraction (PS4, PS3, Xbox 360), Nintendo Switch TitleID and cover art resolution, new Unreal & Unity codenames (Satisfactory, Texas Chain Saw Massacre, Silent Hill f, Another Crab's Treasure), Linux prefix restore telemetry with anonymous opt-in, and XDG config compliance.
-- **v1.0:** Polished interface, bug fixes, and stable public release.
-- **After 1.0 (Any OS to Any OS):** Full bidirectional cross-OS migration. Backup from any supported OS (Windows, Linux, SteamOS) and restore to any supported OS.
+- **v1.0.0 (Current):**
+  - **Universal Multi-Directional Migration:** Full 360° game save migration across Windows ⇄ Linux / Steam Deck, Windows ➔ Windows, and Linux ➔ Linux.
+  - **Native Linux Host Backup Scanner:** Checkpoint can now scan and backup save files natively on Linux and SteamOS directly from Steam Proton prefixes (`compatdata`), Hydra launcher prefixes, Heroic Games Launcher, Lutris, and EmuDeck emulators.
+  - **Uninitialized Wine Prefix Auto-Seeding:** Seamlessly pre-seeds uninitialized Wine/Proton prefixes on Linux with proper user directories and registry keys on demand.
+  - **High-Precision Machine Correlation:** Strict multi-criteria scoring prevents false positive folder matches between game saves.
+  - **Dynamic OS-Adaptive UI:** Desktop interface automatically customizes restore controls and directory pickers according to the host platform (Windows or Linux).
+  - **Expanded Emulator Ecosystem:** Full detection and restore routing for Cemu (Wii U), ShadPS4 (PS4), RPCS3 (PS3), PCSX2 (PS2), DuckStation (PS1), Ryujinx/Yuzu (Switch), Dolphin (GameCube/Wii), and Xenia (Xbox 360).
+  - **Steam Cloud Timestamp Protection & Case-Insensitive Matching:** Prevents cloud overwrites and handles cross-OS filesystem casing differences effortlessly.
 
 ## Building from Source
 
