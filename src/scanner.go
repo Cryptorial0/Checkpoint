@@ -1058,6 +1058,11 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 	SetProgress("scan", 50, "Scanning user Documents...", 50, 100, "")
 	scanUserDocumentsGames(&games, seenPaths)
 
+	if runtime.GOOS != "windows" {
+		SetProgress("scan", 55, "Scanning Linux Steam Proton, Hydra, Heroic prefixes & emulators...", 55, 100, "")
+		scanLinuxHostSaves(&games, seenPaths)
+	}
+
 	// 2. In-Tree & Drive-wide Scans (Lies of P, portable emulators, Bloodborne bbport, custom roots)
 	scanRoots := []string{}
 	if runtime.GOOS == "windows" {
@@ -1100,6 +1105,17 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 			}
 		}
 	} else {
+		// Linux game roots
+		home := os.Getenv("HOME")
+		if home != "" {
+			scanRoots = append(scanRoots,
+				filepath.Join(home, "Games"),
+				filepath.Join(home, "games"),
+			)
+			for _, lib := range findSteamLibraryFolders() {
+				scanRoots = append(scanRoots, filepath.Join(lib, "steamapps", "common"))
+			}
+		}
 		// Mock testing roots for linux dev
 		mockDocs := filepath.Join(os.Getenv("HOME"), "mock_windows", "Documents")
 		if _, err := os.Stat(mockDocs); err == nil {
@@ -4428,4 +4444,306 @@ func sanitizeID(s string) string {
 	s = strings.ReplaceAll(s, "/", "_")
 	s = strings.ReplaceAll(s, "\\", "_")
 	return strings.ToLower(s)
+}
+
+// ========================================================
+// NATIVE LINUX BACKUP SCANNER (Linux-to-Linux & Linux-to-Win)
+// ========================================================
+
+func scanPCSX2Memcards(memDir string, games *[]DetectedGame, seen map[string]bool) {
+	if stat, err := os.Stat(memDir); err == nil && stat.IsDir() && !seen[memDir] {
+		count, size := getDirStats(memDir)
+		if count > 0 {
+			seen[memDir] = true
+			*games = append(*games, DetectedGame{
+				ID:                 "emu_pcsx2",
+				Name:               "PlayStation 2 Memory Cards (PCSX2)",
+				SaveType:           SaveTypeInTree,
+				StorageType:        "PS2 Emulator",
+				SourcePath:         memDir,
+				TargetRelativePath: "PCSX2/memcards",
+				FileCount:          count,
+				SizeBytes:          size,
+			})
+		}
+	}
+}
+
+func scanDolphinDir(dolphinDir string, games *[]DetectedGame, seen map[string]bool) {
+	if stat, err := os.Stat(dolphinDir); err == nil && stat.IsDir() && !seen[dolphinDir] {
+		count, size := getDirStats(dolphinDir)
+		if count > 0 {
+			seen[dolphinDir] = true
+			*games = append(*games, DetectedGame{
+				ID:                 "emu_dolphin",
+				Name:               "GameCube & Wii Saves (Dolphin)",
+				SaveType:           SaveTypeInTree,
+				StorageType:        "Wii/GC Emulator",
+				SourcePath:         dolphinDir,
+				TargetRelativePath: "dolphin-emu/GC",
+				FileCount:          count,
+				SizeBytes:          size,
+			})
+		}
+	}
+}
+
+func scanDuckStationDir(duckDir string, games *[]DetectedGame, seen map[string]bool) {
+	memcards := filepath.Join(duckDir, "memcards")
+	if stat, err := os.Stat(memcards); err == nil && stat.IsDir() {
+		duckDir = memcards
+	}
+	if stat, err := os.Stat(duckDir); err == nil && stat.IsDir() && !seen[duckDir] {
+		count, size := getDirStats(duckDir)
+		if count > 0 {
+			seen[duckDir] = true
+			*games = append(*games, DetectedGame{
+				ID:                 "emu_duckstation",
+				Name:               "PlayStation 1 Memory Cards (DuckStation)",
+				SaveType:           SaveTypeInTree,
+				StorageType:        "PS1 Emulator",
+				SourcePath:         duckDir,
+				TargetRelativePath: "duckstation/memcards",
+				FileCount:          count,
+				SizeBytes:          size,
+			})
+		}
+	}
+}
+
+func scanWinePrefix(prefixRoot string, originAppID string, games *[]DetectedGame, seen map[string]bool) {
+	driveC := filepath.Join(prefixRoot, "drive_c")
+	if stat, err := os.Stat(driveC); err != nil || !stat.IsDir() {
+		driveC = filepath.Join(prefixRoot, "pfx", "drive_c")
+		if stat, err := os.Stat(driveC); err != nil || !stat.IsDir() {
+			return
+		}
+	}
+
+	usersDir := filepath.Join(driveC, "users")
+	uEntries, err := os.ReadDir(usersDir)
+	if err != nil {
+		return
+	}
+
+	for _, ue := range uEntries {
+		if !ue.IsDir() {
+			continue
+		}
+		uName := ue.Name()
+		uLow := strings.ToLower(uName)
+		if uLow == "public" {
+			pubDocs := filepath.Join(usersDir, uName, "Documents")
+			if stat, err := os.Stat(pubDocs); err == nil && stat.IsDir() {
+				runeBase := filepath.Join(pubDocs, "Steam", "RUNE")
+				scanAppIDSubdirs(runeBase, "Offline Profile", "users/Public/Documents/Steam/RUNE", games, seen)
+				codexBase := filepath.Join(pubDocs, "Steam", "CODEX")
+				scanAppIDSubdirs(codexBase, "Offline Profile", "users/Public/Documents/Steam/CODEX", games, seen)
+				empressBase := filepath.Join(pubDocs, "EMPRESS")
+				scanAppIDSubdirs(empressBase, "Offline Profile", "users/Public/Documents/EMPRESS", games, seen)
+			}
+			continue
+		}
+
+		uPath := filepath.Join(usersDir, uName)
+
+		// 1. AppData Local
+		localApp := filepath.Join(uPath, "AppData", "Local")
+		if stat, err := os.Stat(localApp); err == nil && stat.IsDir() {
+			scanLocalAppDataUnrealGames(localApp, games, seen)
+			skidrowBase := filepath.Join(localApp, "SKIDROW")
+			scanAppIDSubdirs(skidrowBase, "Offline Profile", "users/steamuser/AppData/Local/SKIDROW", games, seen)
+		}
+
+		// 2. AppData Roaming
+		roamingApp := filepath.Join(uPath, "AppData", "Roaming")
+		if stat, err := os.Stat(roamingApp); err == nil && stat.IsDir() {
+			goldbergBase := filepath.Join(roamingApp, "Goldberg SteamEmu Saves")
+			scanAppIDSubdirs(goldbergBase, "Offline Profile", "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves", games, seen)
+			fltBase := filepath.Join(roamingApp, "FLT")
+			scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
+
+			fromSoftGames := []struct {
+				dirName  string
+				gameName string
+				appID    string
+			}{
+				{"EldenRing", "Elden Ring (Character Saves)", "1245620"},
+				{"DarkSoulsIII", "Dark Souls III", "374320"},
+				{"Sekiro", "Sekiro: Shadows Die Twice", "814380"},
+				{"ArmoredCore6", "Armored Core VI", "1888160"},
+			}
+			for _, fg := range fromSoftGames {
+				saveDir := filepath.Join(roamingApp, fg.dirName)
+				if stat, err := os.Stat(saveDir); err == nil && stat.IsDir() && !seen[saveDir] {
+					count, size := getDirStats(saveDir)
+					if count > 0 {
+						seen[saveDir] = true
+						*games = append(*games, DetectedGame{
+							ID:                 "fromsoft_" + strings.ToLower(fg.dirName),
+							Name:               fg.gameName,
+							AppID:              fg.appID,
+							SaveType:           SaveTypePrefix,
+							StorageType:        "AppData Profile",
+							SourcePath:         saveDir,
+							TargetRelativePath: "users/steamuser/AppData/Roaming/" + fg.dirName,
+							FileCount:          count,
+							SizeBytes:          size,
+							IconURL:            getSteamIconURL(fg.appID),
+							ProtonTier:         fetchProtonDBTier(fg.appID),
+						})
+					}
+				}
+			}
+		}
+
+		// 3. AppData LocalLow
+		localLow := filepath.Join(uPath, "AppData", "LocalLow")
+		if stat, err := os.Stat(localLow); err == nil && stat.IsDir() {
+			scanUserAppDataLocalLow(localLow, games, seen)
+		}
+
+		// 4. Documents & Saved Games
+		docs := filepath.Join(uPath, "Documents")
+		if stat, err := os.Stat(docs); err == nil && stat.IsDir() {
+			scanSpecificDocsDir(docs, games, seen)
+		}
+		savedGames := filepath.Join(uPath, "Saved Games")
+		if stat, err := os.Stat(savedGames); err == nil && stat.IsDir() {
+			scanSpecificDocsDir(savedGames, games, seen)
+		}
+	}
+
+	if originAppID != "" {
+		for i := range *games {
+			g := &(*games)[i]
+			if strings.HasPrefix(filepath.ToSlash(g.SourcePath), filepath.ToSlash(prefixRoot)) {
+				if g.AppID == "" {
+					g.AppID = originAppID
+					if g.IconURL == "" {
+						g.IconURL = getSteamIconURL(originAppID)
+					}
+					if g.ProtonTier == "" {
+						g.ProtonTier = fetchProtonDBTier(originAppID)
+					}
+				}
+			}
+		}
+	}
+}
+
+func scanLinuxConsoleEmulators(games *[]DetectedGame, seen map[string]bool) {
+	home := os.Getenv("HOME")
+	if home == "" {
+		return
+	}
+
+	emuDeckRoots := []string{filepath.Join(home, "Emulation", "saves")}
+	if matches, err := filepath.Glob("/run/media/*/Emulation/saves"); err == nil {
+		emuDeckRoots = append(emuDeckRoots, matches...)
+	}
+	if matches, err := filepath.Glob("/run/media/*/*/Emulation/saves"); err == nil {
+		emuDeckRoots = append(emuDeckRoots, matches...)
+	}
+	if matches, err := filepath.Glob("/media/*/Emulation/saves"); err == nil {
+		emuDeckRoots = append(emuDeckRoots, matches...)
+	}
+
+	for _, ed := range emuDeckRoots {
+		scanCemuSaves(filepath.Join(ed, "cemu", "mlc01", "usr", "save"), "cemu/mlc01/usr/save", games, seen)
+		scanCemuSaves(filepath.Join(ed, "cemu"), "cemu/mlc01/usr/save", games, seen)
+		scanSwitchEmuDir(filepath.Join(ed, "ryujinx"), "Ryujinx", "Ryujinx/bis/user/save", games, seen)
+		scanSwitchEmuDir(filepath.Join(ed, "yuzu"), "Yuzu", "yuzu/nand/user/save", games, seen)
+		scanRPCS3Home(filepath.Join(ed, "rpcs3", "dev_hdd0", "home"), games, seen)
+		scanPCSX2Memcards(filepath.Join(ed, "pcsx2"), games, seen)
+		scanPCSX2Memcards(filepath.Join(ed, "pcsx2", "memcards"), games, seen)
+		scanDolphinDir(filepath.Join(ed, "dolphin", "GC"), games, seen)
+		scanDolphinDir(filepath.Join(ed, "dolphin"), games, seen)
+		scanDuckStationDir(filepath.Join(ed, "duckstation"), games, seen)
+	}
+
+	scanCemuSaves(filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "Cemu", "mlc01", "usr", "save"), "cemu/mlc01/usr/save", games, seen)
+	scanCemuSaves(filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "cemu", "mlc01", "usr", "save"), "cemu/mlc01/usr/save", games, seen)
+	scanSwitchEmuDir(filepath.Join(home, ".config", "Ryujinx", "bis", "user", "save"), "Ryujinx", "Ryujinx/bis/user/save", games, seen)
+	scanSwitchEmuDir(filepath.Join(home, ".var", "app", "org.ryujinx.Ryujinx", "config", "Ryujinx", "bis", "user", "save"), "Ryujinx", "Ryujinx/bis/user/save", games, seen)
+	scanRPCS3Home(filepath.Join(home, ".config", "rpcs3", "dev_hdd0", "home"), games, seen)
+	scanRPCS3Home(filepath.Join(home, ".var", "app", "net.rpcs3.RPCS3", "config", "rpcs3", "dev_hdd0", "home"), games, seen)
+	scanPCSX2Memcards(filepath.Join(home, ".config", "PCSX2", "memcards"), games, seen)
+	scanPCSX2Memcards(filepath.Join(home, ".var", "app", "net.pcsx2.PCSX2", "config", "PCSX2", "memcards"), games, seen)
+	scanShadPS4Locations("", "", games, seen)
+}
+
+func scanLinuxHostSaves(games *[]DetectedGame, seen map[string]bool) {
+	home := os.Getenv("HOME")
+	if home == "" {
+		return
+	}
+
+	// 1. Steam Library Proton Prefixes (compatdata)
+	steamLibs := findSteamLibraryFolders()
+	for _, lib := range steamLibs {
+		compatdataDir := filepath.Join(lib, "steamapps", "compatdata")
+		entries, err := os.ReadDir(compatdataDir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			appID := e.Name()
+			if _, err := strconv.Atoi(appID); err != nil {
+				continue
+			}
+			pfx := filepath.Join(compatdataDir, appID)
+			scanWinePrefix(pfx, appID, games, seen)
+		}
+	}
+
+	// 2. Hydra Launcher Prefixes
+	hydraBase := filepath.Join(home, ".config", "hydralauncher", "wine-prefixes")
+	if hEntries, err := os.ReadDir(hydraBase); err == nil {
+		for _, he := range hEntries {
+			if he.IsDir() {
+				appID := he.Name()
+				scanWinePrefix(filepath.Join(hydraBase, appID), appID, games, seen)
+			}
+		}
+	}
+
+	// 3. Heroic Games Launcher Prefixes
+	heroicBases := []string{
+		filepath.Join(home, ".config", "heroic", "prefixes"),
+		filepath.Join(home, ".var", "app", "com.heroicgameslauncher.hgl", "config", "heroic", "prefixes"),
+		filepath.Join(home, "Games", "Heroic", "prefixes"),
+		filepath.Join(home, "Games", "heroic", "prefixes"),
+	}
+	for _, hb := range heroicBases {
+		if entries, err := os.ReadDir(hb); err == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					scanWinePrefix(filepath.Join(hb, e.Name()), "", games, seen)
+				}
+			}
+		}
+	}
+
+	// 4. Lutris Prefixes
+	lutrisBases := []string{
+		filepath.Join(home, "Games"),
+		filepath.Join(home, "Games", "lutris"),
+		filepath.Join(home, ".local", "share", "lutris", "prefixes"),
+	}
+	for _, lb := range lutrisBases {
+		if entries, err := os.ReadDir(lb); err == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					scanWinePrefix(filepath.Join(lb, e.Name()), "", games, seen)
+				}
+			}
+		}
+	}
+
+	// 5. Console Emulators
+	scanLinuxConsoleEmulators(games, seen)
 }

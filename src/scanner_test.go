@@ -865,6 +865,166 @@ func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
 	}
 }
 
+func TestWindowsToWindowsRestoration(t *testing.T) {
+	tmpWinHome, err := os.MkdirTemp("", "win_restore_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp win home: %v", err)
+	}
+	defer os.RemoveAll(tmpWinHome)
+
+	origAppData := os.Getenv("APPDATA")
+	origLocalAppData := os.Getenv("LOCALAPPDATA")
+	origUserProfile := os.Getenv("USERPROFILE")
+	origPublic := os.Getenv("PUBLIC")
+
+	winAppData := filepath.Join(tmpWinHome, "AppData", "Roaming")
+	winLocalAppData := filepath.Join(tmpWinHome, "AppData", "Local")
+	winUserProfile := tmpWinHome
+	winPublic := filepath.Join(tmpWinHome, "Public")
+
+	os.Setenv("APPDATA", winAppData)
+	os.Setenv("LOCALAPPDATA", winLocalAppData)
+	os.Setenv("USERPROFILE", winUserProfile)
+	os.Setenv("PUBLIC", winPublic)
+	defer func() {
+		os.Setenv("APPDATA", origAppData)
+		os.Setenv("LOCALAPPDATA", origLocalAppData)
+		os.Setenv("USERPROFILE", origUserProfile)
+		os.Setenv("PUBLIC", origPublic)
+	}()
+
+	os.MkdirAll(filepath.Join(winLocalAppData, "TEKKEN 8", "Saved", "SaveGames"), 0755)
+	os.MkdirAll(filepath.Join(winAppData, "EldenRing"), 0755)
+	os.MkdirAll(filepath.Join(winUserProfile, "Documents", "My Games"), 0755)
+	os.MkdirAll(filepath.Join(winUserProfile, "Saved Games"), 0755)
+	os.MkdirAll(filepath.Join(winPublic, "Documents", "Steam", "RUNE"), 0755)
+
+	// 1. AppData/Local (Tekken 8)
+	t8Meta := GameSaveMeta{
+		ID:                 "unreal_tekken_8",
+		GameName:           "TEKKEN 8",
+		AppID:              "1778820",
+		TargetRelativePath: "users/steamuser/AppData/Local/TEKKEN 8/Saved/SaveGames",
+	}
+	t8Target, t8Status, t8Desc := AutoLocateWindowsTarget(t8Meta)
+	expectedT8 := filepath.Join(winLocalAppData, "TEKKEN 8", "Saved", "SaveGames")
+	if t8Target != expectedT8 {
+		t.Errorf("Expected T8 target %s, got %s", expectedT8, t8Target)
+	}
+	if t8Status != "windows_detected" {
+		t.Errorf("Expected windows_detected status for existing folder, got %s", t8Status)
+	}
+	if !strings.Contains(t8Desc, "AppData/Local") {
+		t.Errorf("Expected AppData/Local in desc, got %s", t8Desc)
+	}
+
+	// 2. AppData/Roaming (Elden Ring)
+	erMeta := GameSaveMeta{
+		ID:                 "fromsoft_eldenring",
+		GameName:           "Elden Ring",
+		AppID:              "1245620",
+		TargetRelativePath: "users/steamuser/AppData/Roaming/EldenRing",
+	}
+	erTarget, erStatus, _ := AutoLocateWindowsTarget(erMeta)
+	expectedER := filepath.Join(winAppData, "EldenRing")
+	if erTarget != expectedER {
+		t.Errorf("Expected ER target %s, got %s", expectedER, erTarget)
+	}
+	if erStatus != "windows_detected" {
+		t.Errorf("Expected windows_detected, got %s", erStatus)
+	}
+
+	// 3. Documents (Outlast)
+	olMeta := GameSaveMeta{
+		ID:                 "doc_outlast",
+		GameName:           "Outlast",
+		AppID:              "238320",
+		TargetRelativePath: "users/steamuser/Documents/My Games/Outlast",
+	}
+	olTarget, olStatus, _ := AutoLocateWindowsTarget(olMeta)
+	expectedOL := filepath.Join(winUserProfile, "Documents", "My Games", "Outlast")
+	if olTarget != expectedOL {
+		t.Errorf("Expected Outlast target %s, got %s", expectedOL, olTarget)
+	}
+	if olStatus != "windows_ready" {
+		t.Errorf("Expected windows_ready for uncreated Outlast child folder, got %s", olStatus)
+	}
+
+	// 4. Public Documents (RUNE)
+	runeMeta := GameSaveMeta{
+		ID:                 "profile_123456",
+		GameName:           "RUNE Game",
+		AppID:              "123456",
+		TargetRelativePath: "users/Public/Documents/Steam/RUNE/123456",
+	}
+	runeTarget, _, _ := AutoLocateWindowsTarget(runeMeta)
+	expectedRune := filepath.Join(winPublic, "Documents", "Steam", "RUNE", "123456")
+	if runeTarget != expectedRune {
+		t.Errorf("Expected RUNE target %s, got %s", expectedRune, runeTarget)
+	}
+
+	// 5. Cemu on Windows
+	cemuMeta := GameSaveMeta{
+		ID:                 "cemu_00050000_101c9500",
+		GameName:           "The Legend of Zelda",
+		TargetRelativePath: "cemu/mlc01/usr/save/00050000/101c9500",
+	}
+	cemuTarget, _, _ := AutoLocateWindowsTarget(cemuMeta)
+	expectedCemu := filepath.Join(winAppData, "Cemu", "mlc01", "usr", "save", "00050000", "101c9500")
+	if cemuTarget != expectedCemu {
+		t.Errorf("Expected Cemu Windows target %s, got %s", expectedCemu, cemuTarget)
+	}
+}
+
+func TestLinuxHostScanner(t *testing.T) {
+	tmpLinux, err := os.MkdirTemp("", "linux_host_scanner_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp linux dir: %v", err)
+	}
+	defer os.RemoveAll(tmpLinux)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpLinux)
+	defer os.Setenv("HOME", origHome)
+
+	// 1. Setup a mock Steam Proton compatdata prefix
+	protonPfx := filepath.Join(tmpLinux, ".local", "share", "Steam", "steamapps", "compatdata", "1245620", "pfx", "drive_c")
+	erSaveDir := filepath.Join(protonPfx, "users", "steamuser", "AppData", "Roaming", "EldenRing")
+	os.MkdirAll(erSaveDir, 0755)
+	os.WriteFile(filepath.Join(erSaveDir, "ER0000.sl2"), []byte("elden_ring_save_bytes"), 0644)
+
+	// 2. Setup mock EmuDeck Cemu saves
+	cemuSave := filepath.Join(tmpLinux, "Emulation", "saves", "cemu", "mlc01", "usr", "save", "00050000", "101c9500")
+	os.MkdirAll(filepath.Join(cemuSave, "user"), 0755)
+	os.WriteFile(filepath.Join(cemuSave, "user", "game_data.sav"), []byte("botw_save"), 0644)
+
+	var games []DetectedGame
+	seen := make(map[string]bool)
+
+	scanLinuxHostSaves(&games, seen)
+
+	foundER := false
+	foundCemu := false
+	for _, g := range games {
+		if g.AppID == "1245620" && strings.Contains(g.Name, "Elden Ring") {
+			foundER = true
+			if g.TargetRelativePath != "users/steamuser/AppData/Roaming/EldenRing" {
+				t.Errorf("Expected normalized relative path for Elden Ring, got %s", g.TargetRelativePath)
+			}
+		}
+		if strings.HasPrefix(g.ID, "cemu_") {
+			foundCemu = true
+		}
+	}
+
+	if !foundER {
+		t.Errorf("Failed to detect Elden Ring from Proton compatdata prefix")
+	}
+	if !foundCemu {
+		t.Errorf("Failed to detect Cemu from Linux EmuDeck saves")
+	}
+}
+
 func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
 	// 1. Unreal Engine Codenames
 	testCodenames := map[string]struct {
