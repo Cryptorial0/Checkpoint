@@ -145,10 +145,16 @@ async function loadSystemStatus() {
         badge.textContent = "Linux Restorer";
         badge.style.backgroundColor = "#2ea043";
         setAppMode("restore");
+        document.getElementById("target-launcher-container")?.classList.remove("hidden");
       } else {
-        badge.textContent = "Windows Backup Edition";
+        badge.textContent = "Windows Edition";
         badge.style.backgroundColor = "#1f6feb";
         setAppMode("backup");
+        document.getElementById("target-launcher-container")?.classList.add("hidden");
+        const bannerRestoreText = document.getElementById("banner-restore-text");
+        if (bannerRestoreText) {
+          bannerRestoreText.innerHTML = "Select your <code>game_saves_bundle.zip</code> to restore. Automatically restores saves directly to native <strong>%APPDATA%</strong>, <strong>%LOCALAPPDATA%</strong>, <strong>Documents</strong>, and <strong>Saved Games</strong> with Steam Cloud timestamp protection.";
+        }
       }
     }
 
@@ -1595,14 +1601,24 @@ function setRowTarget(idx, path, statusClass, statusText) {
 async function validateAndSetCustomPrefix(idx, game, chosenFolder) {
   if (!chosenFolder || chosenFolder.trim() === "") return;
 
+  const targetInput = document.getElementById(`restore-target-${idx}`);
+  const statusBadge = document.getElementById(`restore-status-${idx}`);
+  const select = document.getElementById(`launcher-select-${idx}`);
+
+  if (currentPlatform === "windows") {
+    if (targetInput) targetInput.value = chosenFolder;
+    if (statusBadge) {
+      statusBadge.className = "status-badge status-badge-proton";
+      statusBadge.textContent = "✓ Custom Folder Selected";
+    }
+    log(`Custom Windows save destination set to: ${chosenFolder}`);
+    return;
+  }
+
   log(`Validating custom prefix: ${chosenFolder}...`);
   try {
     const res = await fetch(`/api/validate-prefix?path=${encodeURIComponent(chosenFolder)}`);
     const data = await res.json();
-
-    const targetInput = document.getElementById(`restore-target-${idx}`);
-    const statusBadge = document.getElementById(`restore-status-${idx}`);
-    const select = document.getElementById(`launcher-select-${idx}`);
 
     if (select) select.value = "custom";
 
@@ -1650,6 +1666,7 @@ function renderRestoreResults(games) {
     item.className = "game-item";
     item.id = `restore-card-${idx}`;
 
+    const isWindows = currentPlatform === "windows";
     const isUninit = game.target_status === "not_initialized";
 
     // Status Badge styling
@@ -1659,6 +1676,7 @@ function renderRestoreResults(games) {
     else if (game.target_status === "lutris_detected") statusClass = "status-badge-lutris";
     else if (game.target_status === "proton_detected") statusClass = "status-badge-proton";
     else if (game.target_status === "emulator_detected") statusClass = "status-badge-emu";
+    else if (game.target_status === "windows_detected" || game.target_status === "windows_ready") statusClass = "status-badge-proton";
     else if (isUninit) statusClass = "status-badge-seed";
     else if (game.target_status === "remembered") statusClass = "status-badge-proton";
 
@@ -1667,6 +1685,23 @@ function renderRestoreResults(games) {
     const iconHtml = game.icon_url ? `<img class="game-icon" src="${game.icon_url}" onerror="if(this.dataset.tried!=='1'&&'${game.appid}'){this.dataset.tried='1';this.src='https://shared.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg';}else{this.style.display='none';}">` : "";
 
     const selectedLauncher = game.selected_launcher || "auto";
+
+    const launcherControlsHtml = isWindows
+      ? `<span style="font-size: 11px; color: #3fb950; font-weight: 600;">Windows Destination</span>`
+      : `<div style="display: inline-flex; align-items: center; gap: 4px;">
+            <label for="launcher-select-${idx}" style="font-size: 11px; color: #8b949e;">Launcher:</label>
+            <select id="launcher-select-${idx}" class="launcher-select" style="font-size: 11px; padding: 2px 24px 2px 8px;">
+              <option value="auto" ${selectedLauncher === 'auto' ? 'selected' : ''}>Auto (Hydra → Heroic → Lutris)</option>
+              <option value="hydra" ${selectedLauncher === 'hydra' ? 'selected' : ''}>Hydra Launcher</option>
+              <option value="heroic" ${selectedLauncher === 'heroic' ? 'selected' : ''}>Heroic Games Launcher</option>
+              <option value="lutris" ${selectedLauncher === 'lutris' ? 'selected' : ''}>Lutris</option>
+              <option value="steam" ${selectedLauncher === 'steam' ? 'selected' : ''}>Steam Proton</option>
+              <option value="custom" ${selectedLauncher === 'custom' ? 'selected' : ''}>Custom Prefix</option>
+            </select>
+          </div>`;
+
+    const browseBtnText = isWindows ? "Change Folder..." : "Change Prefix...";
+    const placeholderText = isWindows ? "Click Change Folder to select destination..." : "Click Change Prefix to select prefix...";
 
     item.innerHTML = `
       <input type="checkbox" id="restore-chk-${idx}" class="restore-game-chk" style="margin-top: 6px; cursor: pointer;">
@@ -1684,23 +1719,13 @@ function renderRestoreResults(games) {
             <span class="game-tag">${escapeHtml(game.storage_type || game.save_type)}</span>
             <span style="font-size: 11px; color: #8b949e;">${game.file_count || 0} files (${formatBytes(game.size_bytes || 0)})</span>
           </div>
-          <div style="display: inline-flex; align-items: center; gap: 4px;">
-            <label for="launcher-select-${idx}" style="font-size: 11px; color: #8b949e;">Launcher:</label>
-            <select id="launcher-select-${idx}" class="launcher-select" style="font-size: 11px; padding: 2px 24px 2px 8px;">
-              <option value="auto" ${selectedLauncher === 'auto' ? 'selected' : ''}>Auto (Hydra → Heroic → Lutris)</option>
-              <option value="hydra" ${selectedLauncher === 'hydra' ? 'selected' : ''}>Hydra Launcher</option>
-              <option value="heroic" ${selectedLauncher === 'heroic' ? 'selected' : ''}>Heroic Games Launcher</option>
-              <option value="lutris" ${selectedLauncher === 'lutris' ? 'selected' : ''}>Lutris</option>
-              <option value="steam" ${selectedLauncher === 'steam' ? 'selected' : ''}>Steam Proton</option>
-              <option value="custom" ${selectedLauncher === 'custom' ? 'selected' : ''}>Custom Prefix</option>
-            </select>
-          </div>
+          ${launcherControlsHtml}
         </div>
 
         <div class="restore-target-row" style="margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
           <span style="font-size: 11px; color: #8b949e; white-space: nowrap;">Restore To:</span>
-          <input type="text" id="restore-target-${idx}" class="restore-target-path" value="${escapeHtml(game.suggested_linux_path || "")}" placeholder="Click Change Prefix to select prefix...">
-          <button id="btn-browse-target-${idx}" class="btn-subtle btn-mini" type="button" style="font-size: 11px; padding: 2px 8px;">Change Prefix...</button>
+          <input type="text" id="restore-target-${idx}" class="restore-target-path" value="${escapeHtml(game.suggested_linux_path || "")}" placeholder="${placeholderText}">
+          <button id="btn-browse-target-${idx}" class="btn-subtle btn-mini" type="button" style="font-size: 11px; padding: 2px 8px;">${browseBtnText}</button>
           ${isUninit ? `<button id="btn-seed-target-${idx}" class="btn-subtle btn-mini" type="button" style="font-size: 11px; padding: 2px 8px; color: #f2cc60; border-color: #d29922;" title="Select and pre-create Wine prefix on restore">Pre-Seed</button>` : ""}
         </div>
       </div>
@@ -1717,7 +1742,8 @@ function renderRestoreResults(games) {
 
       // Manual browse button hook
       document.getElementById(`btn-browse-target-${idx}`)?.addEventListener("click", async () => {
-        const selected = await pickFolder(`Select Wine/Proton Prefix or Destination folder for ${game.game_name}`);
+        const pickerPrompt = isWindows ? `Select destination folder for ${game.game_name}` : `Select Wine/Proton Prefix or Destination folder for ${game.game_name}`;
+        const selected = await pickFolder(pickerPrompt);
         if (selected && selected.trim() !== "") {
           await validateAndSetCustomPrefix(idx, game, selected);
         }
@@ -1781,7 +1807,7 @@ function isGameDetected(idx, game) {
   if (!game) return false;
   const status = game.target_status || "";
   if (status === "manual" || status === "not_initialized") return false;
-  return status.endsWith("_detected") || status === "remembered";
+  return status.endsWith("_detected") || status === "remembered" || status.startsWith("windows_");
 }
 
 document.getElementById("btn-restore-select-detected")?.addEventListener("click", () => {
@@ -1795,9 +1821,13 @@ document.getElementById("btn-restore-select-detected")?.addEventListener("click"
     }
   });
   if (detectedCount === 0) {
-    log("No games with initialized Wine/Proton prefixes found on disk yet. Use 'Select All (Auto-Seed Prefixes)' to pre-create prefixes automatically.");
+    if (currentPlatform === "windows") {
+      log("No detected Windows game destinations found yet.");
+    } else {
+      log("No games with initialized Wine/Proton prefixes found on disk yet. Use 'Select All (Auto-Seed Prefixes)' to pre-create prefixes automatically.");
+    }
   } else {
-    log(`Selected ${detectedCount} detected game(s) with initialized prefixes.`);
+    log(`Selected ${detectedCount} detected game(s).`);
   }
 });
 
