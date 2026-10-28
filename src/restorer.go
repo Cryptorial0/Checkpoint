@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -102,19 +103,29 @@ func enrichManifest(manifest *VaultManifest) {
 				}
 			}
 
-			// Precompute paths for all launchers (Hydra, Heroic, Lutris, Steam)
-			g.LauncherPaths = make(map[string]string)
-			g.LauncherStatuses = make(map[string]string)
+			if runtime.GOOS == "windows" {
+				winPath, statusKey, statusText := AutoLocateWindowsTarget(*g)
+				g.TargetStatus = statusKey
+				g.TargetStatusText = statusText
+				g.SelectedLauncher = "windows"
+				if winPath != "" {
+					g.SuggestedLinuxPath = winPath
+				}
+			} else {
+				// Precompute paths for all launchers (Hydra, Heroic, Lutris, Steam)
+				g.LauncherPaths = make(map[string]string)
+				g.LauncherStatuses = make(map[string]string)
 
-			computeAllLauncherTargets(g)
+				computeAllLauncherTargets(g)
 
-			// Default to Auto resolution (Hydra -> Heroic -> Lutris for offline games)
-			autoPath, statusKey, statusText, chosenLauncher := AutoLocateLinuxTarget(*g)
-			g.TargetStatus = statusKey
-			g.TargetStatusText = statusText
-			g.SelectedLauncher = chosenLauncher
-			if autoPath != "" {
-				g.SuggestedLinuxPath = autoPath
+				// Default to Auto resolution (Hydra -> Heroic -> Lutris for offline games)
+				autoPath, statusKey, statusText, chosenLauncher := AutoLocateLinuxTarget(*g)
+				g.TargetStatus = statusKey
+				g.TargetStatusText = statusText
+				g.SelectedLauncher = chosenLauncher
+				if autoPath != "" {
+					g.SuggestedLinuxPath = autoPath
+				}
 			}
 		}(i)
 	}
@@ -753,6 +764,171 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 	return "", ""
 }
 
+// AutoLocateWindowsTarget maps normalized vault relative paths into native Windows user directories
+func AutoLocateWindowsTarget(meta GameSaveMeta) (string, string, string) {
+	cfg := LoadConfig()
+	if loc, found := cfg.GetLocation(meta.ID, meta.AppID, meta.GameName); found && loc.LinuxResolvedPath != "" {
+		if stat, err := os.Stat(loc.LinuxResolvedPath); err == nil && stat.IsDir() {
+			return loc.LinuxResolvedPath, "windows_detected", "Remembered Windows Location"
+		}
+	}
+
+	appData := os.Getenv("APPDATA")
+	localAppData := os.Getenv("LOCALAPPDATA")
+	userProfile := os.Getenv("USERPROFILE")
+	if userProfile == "" {
+		userProfile = os.Getenv("HOME")
+	}
+	publicDir := os.Getenv("PUBLIC")
+	if publicDir == "" {
+		publicDir = `C:\Users\Public`
+	}
+	publicDocs := filepath.Join(publicDir, "Documents")
+
+	documentsDir := getWindowsPersonalDocumentsDir()
+	if documentsDir == "" && userProfile != "" {
+		documentsDir = filepath.Join(userProfile, "Documents")
+	}
+	savedGamesDir := filepath.Join(userProfile, "Saved Games")
+	localLow := filepath.Join(userProfile, "AppData", "LocalLow")
+
+	relSlash := filepath.ToSlash(meta.TargetRelativePath)
+	relSlashLow := strings.ToLower(relSlash)
+
+	var targetPath string
+	var desc string
+
+	if strings.HasPrefix(relSlashLow, "users/steamuser/appdata/local/") {
+		sub := relSlash[len("users/steamuser/appdata/local/"):]
+		targetPath = filepath.Join(localAppData, filepath.FromSlash(sub))
+		desc = "AppData/Local"
+	} else if strings.HasPrefix(relSlashLow, "users/steamuser/appdata/roaming/") {
+		sub := relSlash[len("users/steamuser/appdata/roaming/"):]
+		targetPath = filepath.Join(appData, filepath.FromSlash(sub))
+		desc = "AppData/Roaming"
+	} else if strings.HasPrefix(relSlashLow, "users/steamuser/appdata/locallow/") {
+		sub := relSlash[len("users/steamuser/appdata/locallow/"):]
+		targetPath = filepath.Join(localLow, filepath.FromSlash(sub))
+		desc = "AppData/LocalLow"
+	} else if strings.HasPrefix(relSlashLow, "users/steamuser/saved games/") {
+		sub := relSlash[len("users/steamuser/saved games/"):]
+		targetPath = filepath.Join(savedGamesDir, filepath.FromSlash(sub))
+		desc = "Saved Games"
+	} else if strings.HasPrefix(relSlashLow, "users/steamuser/documents/") {
+		sub := relSlash[len("users/steamuser/documents/"):]
+		targetPath = filepath.Join(documentsDir, filepath.FromSlash(sub))
+		desc = "Documents"
+	} else if strings.HasPrefix(relSlashLow, "users/public/documents/") {
+		sub := relSlash[len("users/public/documents/"):]
+		targetPath = filepath.Join(publicDocs, filepath.FromSlash(sub))
+		desc = "Public Documents"
+	} else if strings.HasPrefix(relSlashLow, "users/steamuser/steam/userdata/") {
+		steamRoot := getSteamPathFromRegistry()
+		if steamRoot == "" {
+			steamRoot = `C:\Program Files (x86)\Steam`
+		}
+		sub := relSlash[len("users/steamuser/steam/userdata/"):]
+		parts := strings.Split(sub, "/")
+		if len(parts) >= 2 {
+			activeAcc := parts[0]
+			udRoot := filepath.Join(steamRoot, "userdata")
+			if entries, err := os.ReadDir(udRoot); err == nil {
+				for _, e := range entries {
+					if e.IsDir() && e.Name() != "0" && e.Name() != "ac" {
+						activeAcc = e.Name()
+						break
+					}
+				}
+			}
+			targetPath = filepath.Join(steamRoot, "userdata", activeAcc, filepath.FromSlash(strings.Join(parts[1:], "/")))
+		} else {
+			targetPath = filepath.Join(steamRoot, "userdata", filepath.FromSlash(sub))
+		}
+		desc = "Steam Userdata"
+	} else if strings.HasPrefix(relSlashLow, "cemu/") {
+		cemuBase := filepath.Join(appData, "Cemu")
+		if _, err := os.Stat(filepath.Join(localAppData, "Cemu")); err == nil {
+			cemuBase = filepath.Join(localAppData, "Cemu")
+		}
+		sub := relSlash[len("cemu/"):]
+		targetPath = filepath.Join(cemuBase, filepath.FromSlash(sub))
+		desc = "Cemu (Wii U)"
+	} else if strings.HasPrefix(relSlashLow, "ryujinx/") {
+		sub := relSlash[len("ryujinx/"):]
+		targetPath = filepath.Join(appData, "Ryujinx", filepath.FromSlash(sub))
+		desc = "Ryujinx (Switch)"
+	} else if strings.HasPrefix(relSlashLow, "yuzu/") {
+		yuzuBase := filepath.Join(appData, "yuzu")
+		if _, err := os.Stat(filepath.Join(localAppData, "yuzu")); err == nil {
+			yuzuBase = filepath.Join(localAppData, "yuzu")
+		}
+		sub := relSlash[len("yuzu/"):]
+		targetPath = filepath.Join(yuzuBase, filepath.FromSlash(sub))
+		desc = "Yuzu (Switch)"
+	} else if strings.HasPrefix(relSlashLow, "eden/") {
+		sub := relSlash[len("eden/"):]
+		targetPath = filepath.Join(appData, "eden", filepath.FromSlash(sub))
+		desc = "Eden (Switch)"
+	} else if strings.HasPrefix(relSlashLow, "rpcs3/") {
+		sub := relSlash[len("rpcs3/"):]
+		rpcs3Base := `C:\RPCS3`
+		if stat, err := os.Stat(filepath.Join(appData, "rpcs3")); err == nil && stat.IsDir() {
+			rpcs3Base = filepath.Join(appData, "rpcs3")
+		}
+		targetPath = filepath.Join(rpcs3Base, filepath.FromSlash(sub))
+		desc = "RPCS3 (PS3)"
+	} else if strings.HasPrefix(relSlashLow, "pcsx2/") {
+		sub := relSlash[len("pcsx2/"):]
+		targetPath = filepath.Join(documentsDir, "PCSX2", filepath.FromSlash(sub))
+		desc = "PCSX2 (PS2)"
+	} else if strings.HasPrefix(relSlashLow, "duckstation/") {
+		sub := relSlash[len("duckstation/"):]
+		targetPath = filepath.Join(documentsDir, "DuckStation", filepath.FromSlash(sub))
+		desc = "DuckStation (PS1)"
+	} else if strings.HasPrefix(relSlashLow, "dolphin-emu/") {
+		sub := relSlash[len("dolphin-emu/"):]
+		targetPath = filepath.Join(documentsDir, "Dolphin Emulator", filepath.FromSlash(sub))
+		desc = "Dolphin (GameCube/Wii)"
+	} else if strings.HasPrefix(relSlashLow, "xenia/") {
+		sub := relSlash[len("xenia/"):]
+		targetPath = filepath.Join(documentsDir, "Xenia", filepath.FromSlash(sub))
+		desc = "Xenia (Xbox 360)"
+	} else if meta.SaveType == SaveTypeInTree && strings.TrimSpace(meta.GameName) != "" {
+		cleanName := strings.TrimSpace(meta.GameName)
+		foundGameDir := ""
+		for _, drive := range []string{`C:\Games`, `D:\Games`, `E:\Games`, `F:\Games`} {
+			cand := filepath.Join(drive, cleanName)
+			if stat, err := os.Stat(cand); err == nil && stat.IsDir() {
+				foundGameDir = cand
+				break
+			}
+		}
+		if foundGameDir != "" {
+			targetPath = filepath.Join(foundGameDir, filepath.FromSlash(meta.TargetRelativePath))
+		} else {
+			targetPath = filepath.Join(`C:\Games`, cleanName, filepath.FromSlash(meta.TargetRelativePath))
+		}
+		desc = "In-Tree Game Folder"
+	} else if meta.OriginalSourcePath != "" && strings.Contains(meta.OriginalSourcePath, ":\\") {
+		targetPath = meta.OriginalSourcePath
+		desc = "Original Windows Path"
+	}
+
+	if targetPath == "" {
+		return "", "manual", "Manual Target Selection Required"
+	}
+
+	if stat, err := os.Stat(targetPath); err == nil && stat.IsDir() {
+		return targetPath, "windows_detected", fmt.Sprintf("✓ Verified (%s)", desc)
+	}
+	parent := filepath.Dir(targetPath)
+	if stat, err := os.Stat(parent); err == nil && stat.IsDir() {
+		return targetPath, "windows_ready", fmt.Sprintf("Ready to Restore (%s)", desc)
+	}
+
+	return targetPath, "windows_ready", fmt.Sprintf("Ready to Restore (%s)", desc)
+}
+
 // AutoLocateLinuxTarget resolves target paths with strict priority order for offline games:
 // 1. Console Emulators (if emulator save)
 // 2. Hydra Launcher (uses AppID / SteamID)
@@ -982,13 +1158,24 @@ func RestoreGame(sourcePath string, meta GameSaveMeta, customDestDir string) Res
 		})
 		_ = SaveConfig(cfg)
 	} else {
-		autoTarget, _, _, _ := AutoLocateLinuxTarget(meta)
-		if autoTarget != "" {
-			targetDir = autoTarget
+		if runtime.GOOS == "windows" {
+			autoTarget, _, _ := AutoLocateWindowsTarget(meta)
+			if autoTarget != "" {
+				targetDir = autoTarget
+			} else {
+				report.Success = false
+				report.Error = "Target directory could not be resolved on Windows. Please select a destination folder."
+				return report
+			}
 		} else {
-			report.Success = false
-			report.Error = "Target directory not detected on Linux. Please select or initialize the prefix first."
-			return report
+			autoTarget, _, _, _ := AutoLocateLinuxTarget(meta)
+			if autoTarget != "" {
+				targetDir = autoTarget
+			} else {
+				report.Success = false
+				report.Error = "Target directory not detected on Linux. Please select or initialize the prefix first."
+				return report
+			}
 		}
 	}
 

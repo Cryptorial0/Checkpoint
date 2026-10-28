@@ -30,7 +30,7 @@
     <div id="banner-restore" class="alert alert-info" style="margin-bottom: 20px; border-left: 4px solid #00d2aa; background-color: rgba(0, 210, 170, 0.1);">
       <div>
         <div style="font-weight: 600; color: #f0f6fc;">Checkpoint (Beta v0.11.0)</div>
-        <div style="font-size: 12px; color: #c9d1d9;">Select your <code>game_saves_bundle.zip</code> to restore. Auto-detects <strong>Hydra Launcher</strong> prefixes first, then <strong>Heroic</strong> and <strong>Lutris</strong>, with case-insensitive Wine navigation and <strong>Steam Cloud Timestamp Protection</strong>.</div>
+        <div style="font-size: 12px; color: #c9d1d9;" id="banner-restore-text">Select your <code>game_saves_bundle.zip</code> to restore. Auto-detects <strong>Hydra Launcher</strong> prefixes first, then <strong>Heroic</strong> and <strong>Lutris</strong>, with case-insensitive Wine navigation and <strong>Steam Cloud Timestamp Protection</strong>.</div>
       </div>
     </div>
 
@@ -103,7 +103,7 @@
               <button id="btn-restore-select-all" class="btn-subtle" style="font-size: 11px; padding: 3px 8px; color: #58a6ff; border-color: #388bfd;" type="button">Select All (Auto-Seed Prefixes)</button>
               <button id="btn-restore-deselect-all" class="btn-subtle" style="font-size: 11px; padding: 3px 8px;" type="button">Deselect All</button>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;" id="target-launcher-container">
               <label for="global-launcher-select" style="font-size: 12px; color: #8b949e; white-space: nowrap;">Target Launcher (All Titles):</label>
               <select id="global-launcher-select" class="launcher-select">
                 <option value="auto">Auto (Hydra → Heroic → Lutris)</option>
