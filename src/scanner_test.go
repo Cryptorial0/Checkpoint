@@ -812,6 +812,57 @@ func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
 	if targetPath != expectedTarget {
 		t.Errorf("Expected stripped target %s, got %s", expectedTarget, targetPath)
 	}
+
+	// 2. Flatpak Cemu with mlc01/usr/save already created
+	flatpakCemu := filepath.Join(tmpHome, ".var", "app", "info.cemu.Cemu", "data", "Cemu", "mlc01", "usr", "save")
+	os.MkdirAll(flatpakCemu, 0755)
+	// Remove emuDeck dir to test flatpak detection
+	os.RemoveAll(emuDeckCemu)
+
+	flatPath, flatLabel := LocateConsoleEmulatorPath(cemuMeta)
+	if flatPath != flatpakCemu {
+		t.Errorf("Expected Flatpak Cemu mlc01 path %s, got %s", flatpakCemu, flatPath)
+	}
+	if !strings.Contains(flatLabel, "Flatpak") {
+		t.Errorf("Expected Flatpak in label, got %s", flatLabel)
+	}
+	flatTarget, flatStatus, _, _ := AutoLocateLinuxTarget(cemuMeta)
+	if flatStatus != "emulator_detected" {
+		t.Errorf("Expected emulator_detected status for Flatpak, got %s", flatStatus)
+	}
+	expectedFlatTarget := filepath.Join(flatpakCemu, "00050000", "101c9500")
+	if flatTarget != expectedFlatTarget {
+		t.Errorf("Expected flatpak target %s, got %s", expectedFlatTarget, flatTarget)
+	}
+
+	// 3. Fallback when neither exists on disk yet (must NOT route to Wine/Hydra/Heroic!)
+	os.RemoveAll(filepath.Join(tmpHome, ".var"))
+	fallbackTarget, fallbackStatus, _, _ := AutoLocateLinuxTarget(cemuMeta)
+	if fallbackStatus != "emulator_detected" {
+		t.Errorf("Expected emulator fallback status emulator_detected, got %s", fallbackStatus)
+	}
+	if strings.Contains(fallbackTarget, "wine-prefixes") || strings.Contains(fallbackTarget, "drive_c") {
+		t.Errorf("Emulator fallback should never route to Wine prefix: %s", fallbackTarget)
+	}
+
+	// 4. Offline game prefix pre-seeding status check
+	offlineMeta := GameSaveMeta{
+		ID:                 "offline_game_123",
+		AppID:              "123456",
+		GameName:           "Test Game",
+		StorageType:        "Windows LocalAppData",
+		TargetRelativePath: "users/steamuser/AppData/Local/TestGame/Saved/SaveGames",
+	}
+	offTarget, offStatus, offText, _ := AutoLocateLinuxTarget(offlineMeta)
+	if offStatus != "not_initialized" {
+		t.Errorf("Expected not_initialized status, got %s", offStatus)
+	}
+	if !strings.Contains(offText, "Auto-seeds on Restore") {
+		t.Errorf("Expected 'Auto-seeds on Restore' in statusText, got %s", offText)
+	}
+	if !strings.Contains(offTarget, "123456") {
+		t.Errorf("Expected AppID in uninitialized Hydra path, got %s", offTarget)
+	}
 }
 
 func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
