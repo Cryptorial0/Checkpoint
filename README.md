@@ -14,7 +14,10 @@
   <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v1.0.0-00d2aa?style=for-the-badge" alt="Release"></a>
 </p>
 
-Migration tool for PC game saves, offline Steam emulators, and console memory cards. Discovers where your games store progress, packages them into a portable vault archive, and seamlessly restores them across any OS (Windows ⇄ Windows, Windows ⇄ Linux, Linux ⇄ Linux) into the correct folders, Wine prefixes, and Proton prefixes.
+Migration tool for PC game saves, offline Steam emulators, and console memory cards. Discovers where your games store progress, packages them into a portable vault archive, and seamlessly restores them across supported environments (**Windows ➔ Linux / Steam Deck**, **Windows ➔ Windows**, and **Linux ➔ Linux**) into the correct folders, Wine prefixes, and Proton prefixes.
+
+> [!NOTE]
+> **Linux to Windows migration is purposely not supported.** Checkpoint focuses on enabling migration from Windows to Linux / Steam Deck, PC upgrades between Windows machines, and transferring saves across Linux systems.
 
 Launches a standalone desktop interface on Windows and Linux, or drops into a command line interface for headless scripts.
 
@@ -108,7 +111,7 @@ Detects installed online multiplayer games with server-side progress and display
 ## Release Highlights
 
 - **v1.0.0 (Current):**
-  - **Universal Multi-Directional Migration:** Full 360° game save migration across Windows ⇄ Linux / Steam Deck, Windows ➔ Windows, and Linux ➔ Linux.
+  - **Multi-Directional Migration:** Seamless game save migration across Windows ➔ Linux / Steam Deck, Windows ➔ Windows, and Linux ➔ Linux (Linux to Windows migration is purposely not supported).
   - **Native Linux Host Backup Scanner:** Checkpoint can now scan and backup save files natively on Linux and SteamOS directly from Steam Proton prefixes (`compatdata`), Hydra launcher prefixes, Heroic Games Launcher, Lutris, and EmuDeck emulators.
   - **Uninitialized Wine Prefix Auto-Seeding:** Seamlessly pre-seeds uninitialized Wine/Proton prefixes on Linux with proper user directories and registry keys on demand.
   - **High-Precision Machine Correlation:** Strict multi-criteria scoring prevents false positive folder matches between game saves.
