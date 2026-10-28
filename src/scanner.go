@@ -219,7 +219,9 @@ func fetchSteamMetadata(appid string) (string, string) {
 
 		var devs []string
 		devs = append(devs, appData.Data.Developers...)
-		devs = append(devs, appData.Data.Publishers...)
+		// Only cache actual Developer studios (e.g. "Sandfall Interactive").
+		// Never cache platform Publishers (e.g. "PlayStation Publishing LLC", "Xbox Game Studios")
+		// as they publish hundreds of unrelated titles and cause false positives.
 		if len(devs) > 0 {
 			appDevelopersCacheMu.Lock()
 			appDevelopersCache[appid] = devs
@@ -819,15 +821,6 @@ func findAppIDByMachineCorrelation(folderName string, detectedGames []DetectedGa
 	appDevelopersCacheMu.RLock()
 	defer appDevelopersCacheMu.RUnlock()
 
-	ignoredStudioTokens := map[string]bool{
-		"game": true, "games": true, "studio": true, "studios": true,
-		"entertainment": true, "interactive": true, "publishing": true,
-		"corporation": true, "corp": true, "company": true, "co": true,
-		"inc": true, "ltd": true, "llc": true, "team": true, "the": true,
-		"playstation": true, "xbox": true, "nintendo": true, "valve": true,
-		"software": true, "digital": true, "media": true, "productions": true,
-	}
-
 	for _, g := range detectedGames {
 		if g.AppID == "" {
 			continue
@@ -843,10 +836,9 @@ func findAppIDByMachineCorrelation(folderName string, detectedGames []DetectedGa
 			}
 			for _, word := range strings.Fields(devLow) {
 				cleanWord := strings.Trim(word, ",.-_()[]\"'")
-				if len(cleanWord) >= 4 && !ignoredStudioTokens[cleanWord] {
-					if cleanWord == fLow {
-						return g.AppID
-					}
+				// Exact match to full studio token (e.g. "sandfall" == "sandfall")
+				if len(cleanWord) >= 4 && cleanWord == fLow {
+					return g.AppID
 				}
 			}
 		}
@@ -1136,16 +1128,21 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 		scanCustomPath(custom, &games, seenPaths)
 	}
 
-	// Dynamic machine correlation pass: match any studio or custom-named folders against all detected titles and studios
+	// Dynamic machine correlation pass: only resolve engine project/studio folders (Unreal Engine & Unity)
 	SetProgress("scan", 90, "Correlating game titles and studio folders across machine...", 90, 100, "")
 	for i := range games {
 		g := &games[i]
-		if g.AppID == "" {
-			// Skip console emulators and system memory cards from studio correlation
-			if strings.Contains(g.StorageType, "Emulator") || strings.HasPrefix(g.ID, "emu_") {
-				continue
+		if g.AppID == "" && (strings.HasPrefix(g.StorageType, "Unreal Engine") || strings.HasPrefix(g.StorageType, "Unity")) {
+			rawFolder := g.Name
+			if strings.HasPrefix(g.StorageType, "Unreal Engine") {
+				// SourcePath: .../<ProjectName>/Saved/SaveGames
+				rawFolder = filepath.Base(filepath.Dir(filepath.Dir(g.SourcePath)))
+			} else if strings.HasPrefix(g.StorageType, "Unity") {
+				// SourcePath: .../LocalLow/<Company>/<Product>
+				rawFolder = filepath.Base(g.SourcePath)
 			}
-			codeAppID, codeName := findAppIDByInstalledGameFolder(g.Name)
+
+			codeAppID, codeName := findAppIDByInstalledGameFolder(rawFolder)
 			if codeAppID != "" {
 				g.AppID = codeAppID
 				g.Name = codeName
@@ -1153,7 +1150,7 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 				g.ProtonTier = fetchProtonDBTier(codeAppID)
 				continue
 			}
-			matched := findAppIDByMachineCorrelation(g.Name, games)
+			matched := findAppIDByMachineCorrelation(rawFolder, games)
 			if matched != "" {
 				g.AppID = matched
 				g.Name = getGameName(matched, g.Name)
