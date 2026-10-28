@@ -567,7 +567,17 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 	idLow := strings.ToLower(meta.ID)
 
 	// EmuDeck & RetroDECK base paths
-	emuDeckSaves := filepath.Join(home, "Emulation", "saves")
+	emuDeckRoots := []string{filepath.Join(home, "Emulation", "saves")}
+	if matches, err := filepath.Glob("/run/media/*/Emulation/saves"); err == nil {
+		emuDeckRoots = append(emuDeckRoots, matches...)
+	}
+	if matches, err := filepath.Glob("/run/media/*/*/Emulation/saves"); err == nil {
+		emuDeckRoots = append(emuDeckRoots, matches...)
+	}
+	if matches, err := filepath.Glob("/media/*/Emulation/saves"); err == nil {
+		emuDeckRoots = append(emuDeckRoots, matches...)
+	}
+	emuDeckSaves := emuDeckRoots[0]
 	retroDeckSaves := filepath.Join(home, "retrodeck", "saves")
 
 	type candidate struct {
@@ -577,15 +587,18 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 
 	// 1. PlayStation 4 (ShadPS4 / bbport)
 	if strings.Contains(cLow, "ps4") || strings.HasPrefix(idLow, "ps4_") {
-		cands := []candidate{
-			{filepath.Join(emuDeckSaves, "shadps4"), "EmuDeck (ShadPS4)"},
+		var cands []candidate
+		for _, ed := range emuDeckRoots {
+			cands = append(cands, candidate{filepath.Join(ed, "shadps4"), "EmuDeck (ShadPS4)"})
+		}
+		cands = append(cands, []candidate{
 			{filepath.Join(home, ".local", "share", "shadPS4"), "Auto-Detected ShadPS4"},
 			{filepath.Join(home, ".local", "share", "shadps4"), "Auto-Detected ShadPS4"},
 			{filepath.Join(home, ".var", "app", "net.shadps4.shadPS4", "data", "shadPS4"), "Flatpak (ShadPS4)"},
 			{filepath.Join(home, "shadps4"), "Local ShadPS4 Directory"},
 			{filepath.Join(home, "Games", "bbport-linux"), "bbport Installation"},
 			{filepath.Join(home, "bbport"), "Local bbport Directory"},
-		}
+		}...)
 		for _, c := range cands {
 			if stat, err := os.Stat(c.path); err == nil && stat.IsDir() {
 				return c.path, c.label
@@ -594,15 +607,26 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 	}
 
 	// 2. Wii U (Cemu)
-	if strings.Contains(cLow, "cemu") || strings.HasPrefix(idLow, "cemu_") {
-		cands := []candidate{
-			{filepath.Join(emuDeckSaves, "cemu"), "EmuDeck (Cemu)"},
-			{filepath.Join(retroDeckSaves, "cemu"), "RetroDECK (Cemu)"},
-			{filepath.Join(home, ".local", "share", "Cemu"), "Auto-Detected Cemu"},
-			{filepath.Join(home, ".config", "Cemu"), "Auto-Detected Cemu Config"},
-			{filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "Cemu"), "Flatpak (Cemu)"},
-			{filepath.Join(home, "Games", "Cemu"), "Local Cemu Installation"},
+	if strings.Contains(cLow, "cemu") || strings.HasPrefix(idLow, "cemu_") || strings.Contains(cLow, "wii u") || strings.Contains(cLow, "wiiu") {
+		var cands []candidate
+		for _, ed := range emuDeckRoots {
+			cands = append(cands, candidate{filepath.Join(ed, "cemu", "mlc01", "usr", "save"), "EmuDeck (Cemu mlc01)"})
+			cands = append(cands, candidate{filepath.Join(ed, "cemu"), "EmuDeck (Cemu)"})
 		}
+		cands = append(cands, []candidate{
+			{filepath.Join(retroDeckSaves, "cemu"), "RetroDECK (Cemu)"},
+			{filepath.Join(home, ".var", "app", "net.retrodeck.retrodeck", "data", "saves", "cemu"), "RetroDECK Flatpak (Cemu)"},
+			{filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "Cemu", "mlc01", "usr", "save"), "Flatpak (Cemu mlc01)"},
+			{filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "cemu", "mlc01", "usr", "save"), "Flatpak (Cemu mlc01)"},
+			{filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "Cemu"), "Flatpak (Cemu)"},
+			{filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "cemu"), "Flatpak (Cemu)"},
+			{filepath.Join(home, ".local", "share", "Cemu"), "Auto-Detected Cemu"},
+			{filepath.Join(home, ".local", "share", "cemu"), "Auto-Detected Cemu"},
+			{filepath.Join(home, ".config", "Cemu"), "Auto-Detected Cemu Config"},
+			{filepath.Join(home, ".config", "cemu"), "Auto-Detected Cemu Config"},
+			{filepath.Join(home, "Games", "Cemu"), "Local Cemu Installation"},
+			{filepath.Join(home, "Games", "cemu"), "Local Cemu Installation"},
+		}...)
 		for _, c := range cands {
 			if stat, err := os.Stat(c.path); err == nil && stat.IsDir() {
 				return c.path, c.label
@@ -612,12 +636,15 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 
 	// 3. PlayStation 3 (RPCS3)
 	if strings.Contains(cLow, "rpcs3") || strings.HasPrefix(idLow, "rpcs3_") {
-		cands := []candidate{
-			{filepath.Join(emuDeckSaves, "rpcs3"), "EmuDeck (RPCS3)"},
+		var cands []candidate
+		for _, ed := range emuDeckRoots {
+			cands = append(cands, candidate{filepath.Join(ed, "rpcs3"), "EmuDeck (RPCS3)"})
+		}
+		cands = append(cands, []candidate{
 			{filepath.Join(retroDeckSaves, "rpcs3"), "RetroDECK (RPCS3)"},
 			{filepath.Join(home, ".config", "rpcs3"), "Auto-Detected RPCS3"},
 			{filepath.Join(home, ".var", "app", "net.rpcs3.RPCS3", "config", "rpcs3"), "Flatpak (RPCS3)"},
-		}
+		}...)
 		for _, c := range cands {
 			if stat, err := os.Stat(c.path); err == nil && stat.IsDir() {
 				return c.path, c.label
@@ -627,12 +654,15 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 
 	// 4. PlayStation 2 (PCSX2)
 	if strings.Contains(cLow, "pcsx2") || strings.HasPrefix(idLow, "pcsx2_") {
-		cands := []candidate{
-			{filepath.Join(emuDeckSaves, "pcsx2"), "EmuDeck (PCSX2)"},
+		var cands []candidate
+		for _, ed := range emuDeckRoots {
+			cands = append(cands, candidate{filepath.Join(ed, "pcsx2"), "EmuDeck (PCSX2)"})
+		}
+		cands = append(cands, []candidate{
 			{filepath.Join(retroDeckSaves, "pcsx2"), "RetroDECK (PCSX2)"},
 			{filepath.Join(home, ".config", "PCSX2"), "Auto-Detected PCSX2"},
 			{filepath.Join(home, ".var", "app", "net.pcsx2.PCSX2", "config", "PCSX2"), "Flatpak (PCSX2)"},
-		}
+		}...)
 		for _, c := range cands {
 			if stat, err := os.Stat(c.path); err == nil && stat.IsDir() {
 				return c.path, c.label
@@ -746,10 +776,19 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 	// 1. Console Emulators
 	if emuRoot, emuLabel := LocateConsoleEmulatorPath(meta); emuRoot != "" {
 		relPath := meta.TargetRelativePath
-		parts := strings.Split(filepath.ToSlash(relPath), "/")
-		base := filepath.Base(emuRoot)
-		if len(parts) > 1 && strings.EqualFold(parts[0], base) {
-			relPath = strings.Join(parts[1:], "/")
+		cleanRel := filepath.ToSlash(relPath)
+		cleanRoot := filepath.ToSlash(emuRoot)
+
+		if strings.HasSuffix(strings.ToLower(cleanRoot), "/mlc01/usr/save") {
+			cleanRel = strings.TrimPrefix(cleanRel, "cemu/")
+			cleanRel = strings.TrimPrefix(cleanRel, "mlc01/usr/save/")
+			relPath = cleanRel
+		} else {
+			parts := strings.Split(cleanRel, "/")
+			base := filepath.Base(emuRoot)
+			if len(parts) > 1 && strings.EqualFold(parts[0], base) {
+				relPath = strings.Join(parts[1:], "/")
+			}
 		}
 		target := resolveCaseInsensitivePath(emuRoot, relPath)
 		return target, "emulator_detected", emuLabel, "emulator"
@@ -770,6 +809,80 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 				target := resolveCaseInsensitivePath(cand, meta.TargetRelativePath)
 				return target, "intree_detected", "Native Game Directory", "native"
 			}
+		}
+	}
+
+	// Check if emulator save needs fallback routing (never fall through to Wine/Proton prefixes)
+	cLow := strings.ToLower(meta.StorageType)
+	idLow := strings.ToLower(meta.ID)
+
+	isEmulatorSave := strings.Contains(cLow, "emulator") || strings.Contains(cLow, "switch") ||
+		strings.Contains(cLow, "wii") || strings.Contains(cLow, "ps1") || strings.Contains(cLow, "ps2") ||
+		strings.Contains(cLow, "ps3") || strings.Contains(cLow, "ps4") || strings.Contains(cLow, "xbox 360") ||
+		strings.HasPrefix(idLow, "emu_") || strings.HasPrefix(idLow, "cemu_") ||
+		strings.HasPrefix(idLow, "rpcs3_") || strings.HasPrefix(idLow, "pcsx2_") ||
+		strings.HasPrefix(idLow, "ps4_") || strings.HasPrefix(idLow, "switch_") ||
+		strings.HasPrefix(idLow, "duckstation_")
+
+	if isEmulatorSave {
+		// Determine best default emulator directory
+		if strings.Contains(cLow, "cemu") || strings.HasPrefix(idLow, "cemu_") || strings.Contains(cLow, "wii u") || strings.Contains(cLow, "wiiu") {
+			var defaultRoot string
+			var defaultLabel string
+			if stat, err := os.Stat(filepath.Join(home, ".var", "app", "info.cemu.Cemu")); err == nil && stat.IsDir() {
+				defaultRoot = filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "Cemu")
+				defaultLabel = "Flatpak (Cemu - Default)"
+			} else if stat, err := os.Stat(filepath.Join(home, "Emulation")); err == nil && stat.IsDir() {
+				defaultRoot = filepath.Join(home, "Emulation", "saves", "cemu")
+				defaultLabel = "EmuDeck (Cemu - Default)"
+			} else {
+				defaultRoot = filepath.Join(home, ".var", "app", "info.cemu.Cemu", "data", "Cemu")
+				defaultLabel = "Flatpak (Cemu - Default)"
+			}
+			relPath := meta.TargetRelativePath
+			parts := strings.Split(filepath.ToSlash(relPath), "/")
+			if len(parts) > 1 && strings.EqualFold(parts[0], "cemu") {
+				relPath = strings.Join(parts[1:], "/")
+			}
+			target := filepath.Join(defaultRoot, filepath.FromSlash(relPath))
+			return target, "emulator_detected", defaultLabel, "emulator"
+		}
+
+		if strings.Contains(cLow, "rpcs3") || strings.HasPrefix(idLow, "rpcs3_") || strings.Contains(cLow, "ps3") {
+			defaultRoot := filepath.Join(home, ".var", "app", "net.rpcs3.RPCS3", "config", "rpcs3")
+			if stat, err := os.Stat(filepath.Join(home, "Emulation")); err == nil && stat.IsDir() {
+				defaultRoot = filepath.Join(home, "Emulation", "saves", "rpcs3")
+			}
+			relPath := meta.TargetRelativePath
+			parts := strings.Split(filepath.ToSlash(relPath), "/")
+			if len(parts) > 1 && strings.EqualFold(parts[0], "rpcs3") {
+				relPath = strings.Join(parts[1:], "/")
+			}
+			target := filepath.Join(defaultRoot, filepath.FromSlash(relPath))
+			return target, "emulator_detected", "Auto-Target (RPCS3)", "emulator"
+		}
+
+		if strings.Contains(cLow, "pcsx2") || strings.HasPrefix(idLow, "pcsx2_") || strings.Contains(cLow, "ps2") {
+			defaultRoot := filepath.Join(home, ".var", "app", "net.pcsx2.PCSX2", "config", "PCSX2")
+			if stat, err := os.Stat(filepath.Join(home, "Emulation")); err == nil && stat.IsDir() {
+				defaultRoot = filepath.Join(home, "Emulation", "saves", "pcsx2")
+			}
+			relPath := meta.TargetRelativePath
+			parts := strings.Split(filepath.ToSlash(relPath), "/")
+			if len(parts) > 1 && strings.EqualFold(parts[0], "pcsx2") {
+				relPath = strings.Join(parts[1:], "/")
+			}
+			target := filepath.Join(defaultRoot, filepath.FromSlash(relPath))
+			return target, "emulator_detected", "Auto-Target (PCSX2)", "emulator"
+		}
+
+		if strings.Contains(cLow, "switch") || strings.Contains(cLow, "ryujinx") || strings.HasPrefix(idLow, "emu_ryujinx") {
+			defaultRoot := filepath.Join(home, ".var", "app", "org.ryujinx.Ryujinx", "config", "Ryujinx")
+			if stat, err := os.Stat(filepath.Join(home, "Emulation")); err == nil && stat.IsDir() {
+				defaultRoot = filepath.Join(home, "Emulation", "saves", "ryujinx")
+			}
+			target := filepath.Join(defaultRoot, filepath.FromSlash(meta.TargetRelativePath))
+			return target, "emulator_detected", "Auto-Target (Ryujinx)", "emulator"
 		}
 	}
 
@@ -824,12 +937,12 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 	// For offline games, default target is Hydra Launcher (or Heroic if no AppID)
 	if meta.AppID != "" {
 		expected := ExpectedHydraPath(meta.AppID, meta.TargetRelativePath)
-		return expected, "not_initialized", "Prefix Not Initialized (Launch once in Hydra/Heroic)", "hydra"
+		return expected, "not_initialized", "Prefix Uninitialized (Auto-seeds on Restore)", "hydra"
 	}
 
 	if cleanName != "" {
 		expected := ExpectedHeroicPath(cleanName, meta.TargetRelativePath)
-		return expected, "not_initialized", "Prefix Not Initialized (Launch once in Heroic/Lutris)", "heroic"
+		return expected, "not_initialized", "Prefix Uninitialized (Auto-seeds on Restore)", "heroic"
 	}
 
 	return "", "manual", "Manual Path Selection Required", "manual"

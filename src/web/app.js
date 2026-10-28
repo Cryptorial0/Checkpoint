@@ -1550,32 +1550,32 @@ function applyLauncherToGameRow(game, idx, launcher) {
     } else if (game.target_status === "emulator_detected") {
       setRowTarget(idx, game.suggested_linux_path, "status-badge-emu", game.target_status_text);
     } else if (game.launcher_paths?.hydra) {
-      setRowTarget(idx, game.launcher_paths.hydra, "status-badge-warning", "Prefix Not Initialized (Hydra)");
+      setRowTarget(idx, game.launcher_paths.hydra, "status-badge-seed", "Prefix Uninitialized (Auto-seeds on Restore)");
     } else if (game.launcher_paths?.heroic) {
-      setRowTarget(idx, game.launcher_paths.heroic, "status-badge-warning", "Prefix Not Initialized (Heroic)");
+      setRowTarget(idx, game.launcher_paths.heroic, "status-badge-seed", "Prefix Uninitialized (Auto-seeds on Restore)");
     } else {
       setRowTarget(idx, game.suggested_linux_path || "", "status-badge-manual", "Manual Target Required");
     }
   } else if (launcher === "hydra") {
     const p = game.launcher_paths?.hydra || "";
     const isDetected = game.launcher_statuses?.hydra === "hydra_detected";
-    setRowTarget(idx, p, isDetected ? "status-badge-hydra" : "status-badge-warning",
-      isDetected ? "Hydra Prefix (Auto-Detected)" : "Hydra Prefix Not Initialized (Launch once in Hydra)");
+    setRowTarget(idx, p, isDetected ? "status-badge-hydra" : "status-badge-seed",
+      isDetected ? "Hydra Prefix (Auto-Detected)" : "Prefix Uninitialized (Auto-seeds on Restore)");
   } else if (launcher === "heroic") {
     const p = game.launcher_paths?.heroic || "";
     const isDetected = game.launcher_statuses?.heroic === "heroic_detected";
-    setRowTarget(idx, p, isDetected ? "status-badge-heroic" : "status-badge-warning",
-      isDetected ? "Heroic Prefix (Auto-Detected)" : "Heroic Prefix Not Initialized (Launch once in Heroic)");
+    setRowTarget(idx, p, isDetected ? "status-badge-heroic" : "status-badge-seed",
+      isDetected ? "Heroic Prefix (Auto-Detected)" : "Prefix Uninitialized (Auto-seeds on Restore)");
   } else if (launcher === "lutris") {
     const p = game.launcher_paths?.lutris || "";
     const isDetected = game.launcher_statuses?.lutris === "lutris_detected";
-    setRowTarget(idx, p, isDetected ? "status-badge-lutris" : "status-badge-warning",
-      isDetected ? "Lutris Prefix (Auto-Detected)" : "Lutris Prefix Not Initialized (Launch once in Lutris)");
+    setRowTarget(idx, p, isDetected ? "status-badge-lutris" : "status-badge-seed",
+      isDetected ? "Lutris Prefix (Auto-Detected)" : "Prefix Uninitialized (Auto-seeds on Restore)");
   } else if (launcher === "steam") {
     const p = game.launcher_paths?.steam || "";
     const isDetected = game.launcher_statuses?.steam === "proton_detected";
-    setRowTarget(idx, p, isDetected ? "status-badge-proton" : "status-badge-warning",
-      isDetected ? "Steam Proton Prefix" : "Steam Prefix Not Initialized (Launch once in Steam)");
+    setRowTarget(idx, p, isDetected ? "status-badge-proton" : "status-badge-seed",
+      isDetected ? "Steam Proton Prefix" : "Prefix Uninitialized (Auto-seeds on Restore)");
   } else if (launcher === "custom") {
     statusBadge.className = "status-badge status-badge-manual";
     statusBadge.textContent = "Custom Prefix Selected";
@@ -1650,6 +1650,8 @@ function renderRestoreResults(games) {
     item.className = "game-item";
     item.id = `restore-card-${idx}`;
 
+    const isUninit = game.target_status === "not_initialized";
+
     // Status Badge styling
     let statusClass = "status-badge-manual";
     if (game.target_status === "hydra_detected") statusClass = "status-badge-hydra";
@@ -1657,9 +1659,10 @@ function renderRestoreResults(games) {
     else if (game.target_status === "lutris_detected") statusClass = "status-badge-lutris";
     else if (game.target_status === "proton_detected") statusClass = "status-badge-proton";
     else if (game.target_status === "emulator_detected") statusClass = "status-badge-emu";
-    else if (game.target_status === "not_initialized") statusClass = "status-badge-warning";
+    else if (isUninit) statusClass = "status-badge-seed";
     else if (game.target_status === "remembered") statusClass = "status-badge-proton";
 
+    const statusBadgeText = isUninit ? "Prefix Uninitialized (Auto-seeds on Restore)" : (game.target_status_text || "Manual Target");
     const protonBadgeHtml = game.proton_tier ? `<span class="proton-badge proton-${game.proton_tier.toLowerCase()}">ProtonDB: ${game.proton_tier}</span>` : "";
     const iconHtml = game.icon_url ? `<img class="game-icon" src="${game.icon_url}" onerror="if(this.dataset.tried!=='1'&&'${game.appid}'){this.dataset.tried='1';this.src='https://shared.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg';}else{this.style.display='none';}">` : "";
 
@@ -1673,7 +1676,7 @@ function renderRestoreResults(games) {
           <span style="font-weight: 600; font-size: 14px; color: #f0f6fc;">${escapeHtml(game.game_name)}</span>
           ${game.appid ? `<span class="appid-badge">Steam AppID: ${game.appid}</span>` : ""}
           ${protonBadgeHtml}
-          <span id="restore-status-${idx}" class="status-badge ${statusClass}" style="margin-left: auto;">${escapeHtml(game.target_status_text || "Manual Target")}</span>
+          <span id="restore-status-${idx}" class="status-badge ${statusClass}" style="margin-left: auto;">${escapeHtml(statusBadgeText)}</span>
         </div>
 
         <div class="game-meta" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
@@ -1694,10 +1697,11 @@ function renderRestoreResults(games) {
           </div>
         </div>
 
-        <div class="restore-target-row" style="margin-top: 6px;">
+        <div class="restore-target-row" style="margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
           <span style="font-size: 11px; color: #8b949e; white-space: nowrap;">Restore To:</span>
           <input type="text" id="restore-target-${idx}" class="restore-target-path" value="${escapeHtml(game.suggested_linux_path || "")}" placeholder="Click Change Prefix to select prefix...">
           <button id="btn-browse-target-${idx}" class="btn-subtle btn-mini" type="button" style="font-size: 11px; padding: 2px 8px;">Change Prefix...</button>
+          ${isUninit ? `<button id="btn-seed-target-${idx}" class="btn-subtle btn-mini" type="button" style="font-size: 11px; padding: 2px 8px; color: #f2cc60; border-color: #d29922;" title="Select and pre-create Wine prefix on restore">Pre-Seed</button>` : ""}
         </div>
       </div>
     `;
@@ -1718,16 +1722,36 @@ function renderRestoreResults(games) {
           await validateAndSetCustomPrefix(idx, game, selected);
         }
       });
+
+      // Pre-seed button hook
+      document.getElementById(`btn-seed-target-${idx}`)?.addEventListener("click", () => {
+        const chk = document.getElementById(`restore-chk-${idx}`);
+        if (chk) {
+          chk.checked = true;
+          log(`Selected ${game.game_name} for prefix pre-seeding at: ${game.suggested_linux_path}`);
+        }
+      });
     }, 10);
   });
 }
 
 // Bulk Selection
 document.getElementById("btn-restore-select-all")?.addEventListener("click", () => {
-  vaultGames.forEach((_, idx) => {
+  let count = 0;
+  let seedCount = 0;
+  vaultGames.forEach((g, idx) => {
     const chk = document.getElementById(`restore-chk-${idx}`);
-    if (chk) chk.checked = true;
+    if (chk) {
+      chk.checked = true;
+      count++;
+      if (g.target_status === "not_initialized") seedCount++;
+    }
   });
+  if (seedCount > 0) {
+    log(`Selected all ${count} titles (${seedCount} uninitialized prefixes will be auto-seeded on restore).`);
+  } else {
+    log(`Selected all ${count} titles.`);
+  }
 });
 
 document.getElementById("btn-restore-deselect-all")?.addEventListener("click", () => {
@@ -1735,12 +1759,13 @@ document.getElementById("btn-restore-deselect-all")?.addEventListener("click", (
     const chk = document.getElementById(`restore-chk-${idx}`);
     if (chk) chk.checked = false;
   });
+  log("Deselected all titles.");
 });
 
 function isGameDetected(idx, game) {
   const badge = document.getElementById(`restore-status-${idx}`);
   if (badge) {
-    if (badge.classList.contains("status-badge-warning") || badge.classList.contains("status-badge-manual")) {
+    if (badge.classList.contains("status-badge-warning") || badge.classList.contains("status-badge-manual") || badge.classList.contains("status-badge-seed")) {
       return false;
     }
     if (badge.classList.contains("status-badge-hydra") ||
@@ -1748,7 +1773,8 @@ function isGameDetected(idx, game) {
         badge.classList.contains("status-badge-lutris") ||
         badge.classList.contains("status-badge-steam") ||
         badge.classList.contains("status-badge-emu") ||
-        badge.classList.contains("status-badge-proton")) {
+        badge.classList.contains("status-badge-proton") ||
+        badge.classList.contains("status-badge-seeded")) {
       return true;
     }
   }
@@ -1769,9 +1795,9 @@ document.getElementById("btn-restore-select-detected")?.addEventListener("click"
     }
   });
   if (detectedCount === 0) {
-    log("No games with initialized Wine/Proton prefixes found on disk yet.");
+    log("No games with initialized Wine/Proton prefixes found on disk yet. Use 'Select All (Auto-Seed Prefixes)' to pre-create prefixes automatically.");
   } else {
-    log(`Selected ${detectedCount} detected game(s).`);
+    log(`Selected ${detectedCount} detected game(s) with initialized prefixes.`);
   }
 });
 
@@ -1900,6 +1926,20 @@ if (btnStartRestore) {
         if (r.success) {
           successCount++;
           log(`Restored ${r.game_name} -> ${r.target_resolved} (Steam Cloud Timestamp Protected)`);
+          const cardIdx = vaultGames.findIndex(g => g.id === r.game_id || g.game_name === r.game_name);
+          if (cardIdx !== -1) {
+            const badge = document.getElementById(`restore-status-${cardIdx}`);
+            if (badge) {
+              const origText = badge.textContent || "";
+              if (origText.includes("Uninitialized") || origText.includes("Auto-seed")) {
+                badge.className = "status-badge status-badge-seeded";
+                badge.textContent = "✓ Prefix Pre-Created & Restored";
+              } else {
+                badge.className = "status-badge status-badge-proton";
+                badge.textContent = "✓ Restored";
+              }
+            }
+          }
         } else {
           failCount++;
           log(`Failed to restore ${r.game_name}: ${r.error}`);
