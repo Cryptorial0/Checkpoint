@@ -739,6 +739,20 @@ button:disabled {
   color: #e3b341;
 }
 
+.status-badge-seed {
+  background-color: rgba(210, 153, 34, 0.18);
+  border-color: #d29922;
+  color: #f2cc60;
+  border-style: dashed;
+}
+
+.status-badge-seeded {
+  background-color: rgba(46, 160, 67, 0.25);
+  border-color: #2ea043;
+  color: #3fb950;
+  font-weight: 700;
+}
+
 .status-badge-emu {
   background-color: rgba(137, 87, 229, 0.15);
   border-color: #8957e5;
