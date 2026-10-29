@@ -1025,6 +1025,50 @@ func TestLinuxHostScanner(t *testing.T) {
 	}
 }
 
+func TestCustomPrefixDirectoryScan(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "custom_prefixes_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create prefix 1: Elden Ring by name
+	erPfx := filepath.Join(tmpDir, "Elden Ring", "drive_c", "users", "steamuser", "AppData", "Roaming", "EldenRing")
+	os.MkdirAll(erPfx, 0755)
+	os.WriteFile(filepath.Join(erPfx, "ER0000.sl2"), []byte("elden_ring_save"), 0644)
+
+	// Create prefix 2: Cyberpunk by AppID
+	cpPfx := filepath.Join(tmpDir, "1091500", "pfx", "drive_c", "users", "steamuser", "Saved Games", "CD Projekt Red", "Cyberpunk 2077")
+	os.MkdirAll(cpPfx, 0755)
+	os.WriteFile(filepath.Join(cpPfx, "manualsave.dat"), []byte("cp_save"), 0644)
+
+	var games []DetectedGame
+	seen := make(map[string]bool)
+
+	scanCustomPath(tmpDir, &games, seen)
+
+	foundER := false
+	foundCP := false
+	for _, g := range games {
+		if strings.Contains(g.Name, "Elden Ring") {
+			foundER = true
+			if g.AppID != "1245620" {
+				t.Errorf("Expected Elden Ring AppID 1245620 from name resolution, got %s", g.AppID)
+			}
+		}
+		if strings.Contains(g.Name, "Cyberpunk") || g.AppID == "1091500" {
+			foundCP = true
+		}
+	}
+
+	if !foundER {
+		t.Errorf("Custom prefix scan failed to find Elden Ring from subfolder prefix")
+	}
+	if !foundCP {
+		t.Errorf("Custom prefix scan failed to find Cyberpunk 2077 from AppID subfolder prefix")
+	}
+}
+
 func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
 	// 1. Unreal Engine Codenames
 	testCodenames := map[string]struct {

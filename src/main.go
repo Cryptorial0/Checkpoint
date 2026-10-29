@@ -34,6 +34,7 @@ type BackupRequest struct {
 	Games           []DetectedGame `json:"games"`
 	DestDir         string         `json:"dest_dir"`
 	CreateSingleZip bool           `json:"create_single_zip"`
+	OptimizeRPG     bool           `json:"optimize_rpg"`
 }
 
 type InspectRequest struct {
@@ -357,7 +358,7 @@ func main() {
 			dest += `\`
 		}
 
-		manifest, err := CreateBackup(req.Games, dest, req.CreateSingleZip)
+		manifest, err := CreateBackupWithOptions(req.Games, dest, req.CreateSingleZip, req.OptimizeRPG)
 		if err != nil {
 			writeJSON(w, map[string]string{"error": err.Error()})
 			return
@@ -422,6 +423,33 @@ func main() {
 			return
 		}
 		writeJSON(w, map[string]string{"message": msg})
+	})
+
+	// RPG optimization estimate
+	mux.HandleFunc("/api/rpg/estimate", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Games []DetectedGame `json:"games"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		var totalOriginal int64
+		var totalSaved int64
+		var optimizableCount int
+		for _, g := range req.Games {
+			totalOriginal += g.SizeBytes
+			if IsRPGOptimizable(g.Name, g.TargetRelativePath) {
+				_, saved := BuildRPGExcludedPaths(g.SourcePath, g.Name, g.TargetRelativePath)
+				if saved > 0 {
+					totalSaved += saved
+					optimizableCount++
+				}
+			}
+		}
+		writeJSON(w, map[string]interface{}{
+			"optimizable_count": optimizableCount,
+			"original_bytes":   totalOriginal,
+			"saved_bytes":      totalSaved,
+			"optimized_bytes":  totalOriginal - totalSaved,
+		})
 	})
 
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {

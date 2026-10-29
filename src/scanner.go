@@ -3007,8 +3007,8 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 			continue
 		}
 
-		// 2. Handle publisher subfolders (Rockstar Games, Telltale Games, KONAMI, CAPCOM)
-		if nameLow == "rockstar games" || nameLow == "telltale games" || nameLow == "konami" || nameLow == "capcom" {
+		// 2. Handle publisher subfolders (Rockstar Games, Telltale Games, KONAMI, CAPCOM, CD Projekt Red, Respawn)
+		if nameLow == "rockstar games" || nameLow == "telltale games" || nameLow == "konami" || nameLow == "capcom" || nameLow == "cd projekt red" || nameLow == "respawn" || nameLow == "arkane" || nameLow == "machinegames" || nameLow == "bethesda softworks" {
 			pubEntries, err := os.ReadDir(subPath)
 			if err == nil {
 				for _, pe := range pubEntries {
@@ -3035,14 +3035,23 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 							if isOnlineLiveServiceGame(cleanName, appID, pePath) {
 								continue
 							}
+							isSavedGames := strings.EqualFold(filepath.Base(docsDir), "Saved Games")
+							storageLabel := "Documents (" + name + ")"
+							targetRel := "users/steamuser/Documents/" + name + "/" + peName
+							idPrefix := "doc_"
+							if isSavedGames {
+								storageLabel = "Saved Games (" + name + ")"
+								targetRel = "users/steamuser/Saved Games/" + name + "/" + peName
+								idPrefix = "savedgames_"
+							}
 							*games = append(*games, DetectedGame{
-								ID:                 "doc_" + sanitizeID(name) + "_" + sanitizeID(peName),
+								ID:                 idPrefix + sanitizeID(name) + "_" + sanitizeID(peName),
 								Name:               cleanName,
 								AppID:              appID,
 								SaveType:           SaveTypePrefix,
-								StorageType:          "Documents (" + name + ")",
+								StorageType:        storageLabel,
 								SourcePath:         pePath,
-								TargetRelativePath: "users/steamuser/Documents/" + name + "/" + peName,
+								TargetRelativePath: targetRel,
 								FileCount:          count,
 								SizeBytes:          size,
 								IconURL:            iconURL,
@@ -3956,6 +3965,18 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 	}
 }
 
+func isWinePrefixDir(dir string) bool {
+	driveC := filepath.Join(dir, "drive_c")
+	if stat, err := os.Stat(driveC); err == nil && stat.IsDir() {
+		return true
+	}
+	pfxDriveC := filepath.Join(dir, "pfx", "drive_c")
+	if stat, err := os.Stat(pfxDriveC); err == nil && stat.IsDir() {
+		return true
+	}
+	return false
+}
+
 func scanCustomPath(customPath string, games *[]DetectedGame, seen map[string]bool) {
 	if customPath == "" {
 		return
@@ -3963,6 +3984,29 @@ func scanCustomPath(customPath string, games *[]DetectedGame, seen map[string]bo
 	customPath = filepath.Clean(customPath)
 	if _, err := os.Stat(customPath); os.IsNotExist(err) {
 		return
+	}
+
+	// 0. Direct check: Is this custom path itself a Wine/Proton prefix?
+	if isWinePrefixDir(customPath) {
+		scanWinePrefix(customPath, filepath.Base(customPath), games, seen)
+		return
+	}
+
+	// 0b. Direct check: Does this custom path contain subfolders that are Wine/Proton prefixes?
+	if entries, err := os.ReadDir(customPath); err == nil {
+		foundPrefix := false
+		for _, e := range entries {
+			if e.IsDir() {
+				sub := filepath.Join(customPath, e.Name())
+				if isWinePrefixDir(sub) {
+					foundPrefix = true
+					scanWinePrefix(sub, e.Name(), games, seen)
+				}
+			}
+		}
+		if foundPrefix {
+			return
+		}
 	}
 
 	// 1. Direct check: PS4 Emulator savedata (savedata, user/savedata, home/*/savedata)
@@ -4619,12 +4663,18 @@ func scanWinePrefix(prefixRoot string, originAppID string, games *[]DetectedGame
 			g := &(*games)[i]
 			if strings.HasPrefix(filepath.ToSlash(g.SourcePath), filepath.ToSlash(prefixRoot)) {
 				if g.AppID == "" {
-					g.AppID = originAppID
-					if g.IconURL == "" {
-						g.IconURL = getSteamIconURL(originAppID)
+					appIDToUse := originAppID
+					if _, err := strconv.Atoi(originAppID); err != nil {
+						if resolved, _, _ := resolveAppIDByName(originAppID); resolved != "" {
+							appIDToUse = resolved
+						}
 					}
-					if g.ProtonTier == "" {
-						g.ProtonTier = fetchProtonDBTier(originAppID)
+					g.AppID = appIDToUse
+					if g.IconURL == "" && g.AppID != "" {
+						g.IconURL = getSteamIconURL(g.AppID)
+					}
+					if g.ProtonTier == "" && g.AppID != "" {
+						g.ProtonTier = fetchProtonDBTier(g.AppID)
 					}
 				}
 			}

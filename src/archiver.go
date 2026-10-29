@@ -43,6 +43,10 @@ type GameSaveMeta struct {
 }
 
 func CreateBackup(games []DetectedGame, destDir string, createSingleZip bool) (*VaultManifest, error) {
+	return CreateBackupWithOptions(games, destDir, createSingleZip, false)
+}
+
+func CreateBackupWithOptions(games []DetectedGame, destDir string, createSingleZip bool, optimizeRPG bool) (*VaultManifest, error) {
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create destination directory: %w", err)
 	}
@@ -96,9 +100,13 @@ func CreateBackup(games []DetectedGame, destDir string, createSingleZip bool) (*
 			return nil, err
 		}
 
-		// Compress files into data.tar.gz
+		// Compress files into data.tar.gz with optional RPG pruning
 		tarPath := filepath.Join(gameFolder, "data.tar.gz")
-		if err := createTarGz(g.SourcePath, tarPath); err != nil {
+		var excluded map[string]bool
+		if optimizeRPG {
+			excluded, _ = BuildRPGExcludedPaths(g.SourcePath, g.Name, g.TargetRelativePath)
+		}
+		if err := createTarGzFiltered(g.SourcePath, tarPath, excluded); err != nil {
 			return nil, fmt.Errorf("failed archiving %s: %w", g.Name, err)
 		}
 
@@ -219,6 +227,10 @@ func VerifyZipIntegrity(zipPath string) (*ZipVerificationReport, error) {
 }
 
 func createTarGz(sourceDir, tarGzPath string) error {
+	return createTarGzFiltered(sourceDir, tarGzPath, nil)
+}
+
+func createTarGzFiltered(sourceDir, tarGzPath string, excluded map[string]bool) error {
 	tarFile, err := os.Create(tarGzPath)
 	if err != nil {
 		return err
@@ -249,6 +261,14 @@ func createTarGz(sourceDir, tarGzPath string) error {
 			return nil
 		}
 		if relPath == "." {
+			return nil
+		}
+
+		slashRel := filepath.ToSlash(relPath)
+		if excluded != nil && excluded[slashRel] {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
