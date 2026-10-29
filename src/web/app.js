@@ -2100,6 +2100,210 @@ async function initTelemetryUI() {
   }
 }
 
+// Application Auto-Updater Module
+let activeUpdateInfo = null;
+let updateProgressInterval = null;
+
+async function checkForUpdates(manualTrigger = false) {
+  const updateAvailableBtn = document.getElementById("btn-update-available");
+  const updateVersionBadge = document.getElementById("update-badge-version");
+
+  if (manualTrigger) {
+    log("Checking GitHub for application updates...");
+  }
+
+  try {
+    const response = await fetch(`/api/update/check?force=${manualTrigger ? "true" : "false"}`);
+    const data = await response.json();
+
+    if (data.error) {
+      if (manualTrigger) {
+        log(`Update check failed: ${data.error}`);
+        alert(`Update check failed: ${data.error}`);
+      }
+      return;
+    }
+
+    if (data.update_available) {
+      activeUpdateInfo = data;
+      log(`New update available: ${data.latest_version} (Current: ${data.current_version})`);
+
+      if (updateAvailableBtn && updateVersionBadge) {
+        updateVersionBadge.textContent = `v${data.latest_version}`;
+        updateAvailableBtn.classList.remove("hidden");
+      }
+
+      if (manualTrigger) {
+        showUpdateModal();
+      }
+    } else {
+      activeUpdateInfo = null;
+      if (updateAvailableBtn) {
+        updateAvailableBtn.classList.add("hidden");
+      }
+      if (manualTrigger) {
+        log(`Checkpoint is up to date (version ${data.current_version}).`);
+        alert(`Checkpoint is up to date (version ${data.current_version}).`);
+      }
+    }
+  } catch (err) {
+    if (manualTrigger) {
+      log(`Network error checking for updates: ${err}`);
+      alert(`Network error checking for updates: ${err}`);
+    }
+  }
+}
+
+function showUpdateModal() {
+  if (!activeUpdateInfo) return;
+
+  const modal = document.getElementById("update-modal");
+  const badge = document.getElementById("update-modal-badge");
+  const title = document.getElementById("update-modal-title");
+  const notes = document.getElementById("update-modal-notes");
+  const errorText = document.getElementById("update-error-text");
+  const progressBox = document.getElementById("update-progress-container");
+  const installBtn = document.getElementById("btn-update-install");
+  const restartBtn = document.getElementById("btn-update-restart");
+  const dismissBtn = document.getElementById("btn-update-dismiss");
+
+  if (badge) badge.textContent = `v${activeUpdateInfo.latest_version}`;
+  if (title) title.textContent = activeUpdateInfo.release_title || `Release v${activeUpdateInfo.latest_version}`;
+  if (notes) notes.textContent = activeUpdateInfo.release_notes || "No release notes provided.";
+
+  if (errorText) {
+    errorText.textContent = "";
+    errorText.classList.add("hidden");
+  }
+
+  if (progressBox) progressBox.classList.add("hidden");
+  if (restartBtn) restartBtn.classList.add("hidden");
+  if (installBtn) {
+    installBtn.classList.remove("hidden");
+    installBtn.disabled = false;
+    installBtn.textContent = "Install Update";
+  }
+  if (dismissBtn) dismissBtn.disabled = false;
+
+  if (modal) modal.classList.remove("hidden");
+}
+
+function initUpdaterUI() {
+  const updateAvailableBtn = document.getElementById("btn-update-available");
+  if (updateAvailableBtn) {
+    updateAvailableBtn.addEventListener("click", () => {
+      showUpdateModal();
+    });
+  }
+
+  const checkUpdatesBtn = document.getElementById("btn-check-updates");
+  if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener("click", () => {
+      checkForUpdates(true);
+    });
+  }
+
+  const dismissBtn = document.getElementById("btn-update-dismiss");
+  if (dismissBtn) {
+    dismissBtn.addEventListener("click", () => {
+      document.getElementById("update-modal")?.classList.add("hidden");
+    });
+  }
+
+  const installBtn = document.getElementById("btn-update-install");
+  if (installBtn) {
+    installBtn.addEventListener("click", async () => {
+      if (!activeUpdateInfo || !activeUpdateInfo.download_url) {
+        alert("No compatible binary asset found for your platform in this release.");
+        return;
+      }
+
+      const progressBox = document.getElementById("update-progress-container");
+      const progressBar = document.getElementById("update-progress-bar");
+      const progressPercent = document.getElementById("update-progress-percent");
+      const progressStatus = document.getElementById("update-progress-status");
+      const errorText = document.getElementById("update-error-text");
+      const restartBtn = document.getElementById("btn-update-restart");
+
+      installBtn.disabled = true;
+      if (dismissBtn) dismissBtn.disabled = true;
+      if (progressBox) progressBox.classList.remove("hidden");
+      if (progressBar) progressBar.style.width = "0%";
+      if (progressPercent) progressPercent.textContent = "0%";
+      if (progressStatus) progressStatus.textContent = "Connecting to download server...";
+
+      // Poll progress endpoint during download
+      updateProgressInterval = setInterval(async () => {
+        try {
+          const res = await fetch("/api/progress");
+          const p = await res.json();
+          if (p && p.op === "update") {
+            const pct = Math.min(Math.max(p.percent, 0), 100);
+            if (progressBar) progressBar.style.width = `${pct}%`;
+            if (progressPercent) progressPercent.textContent = `${Math.round(pct)}%`;
+            if (progressStatus) progressStatus.textContent = p.status || "Downloading update...";
+          }
+        } catch (e) {}
+      }, 250);
+
+      try {
+        log(`Downloading Checkpoint update from: ${activeUpdateInfo.download_url}`);
+        const response = await fetch("/api/update/apply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ download_url: activeUpdateInfo.download_url }),
+        });
+
+        clearInterval(updateProgressInterval);
+        const result = await response.json();
+
+        if (result.error) {
+          log(`Update installation failed: ${result.error}`);
+          if (errorText) {
+            errorText.textContent = `Update failed: ${result.error}`;
+            errorText.classList.remove("hidden");
+          }
+          installBtn.disabled = false;
+          if (dismissBtn) dismissBtn.disabled = false;
+          return;
+        }
+
+        log("Update installed successfully. Application ready for restart.");
+        if (progressBar) progressBar.style.width = "100%";
+        if (progressPercent) progressPercent.textContent = "100%";
+        if (progressStatus) progressStatus.textContent = "Update installed successfully.";
+
+        installBtn.classList.add("hidden");
+        if (restartBtn) restartBtn.classList.remove("hidden");
+        if (dismissBtn) dismissBtn.disabled = false;
+      } catch (err) {
+        clearInterval(updateProgressInterval);
+        log(`Update error: ${err}`);
+        if (errorText) {
+          errorText.textContent = `Network error: ${err}`;
+          errorText.classList.remove("hidden");
+        }
+        installBtn.disabled = false;
+        if (dismissBtn) dismissBtn.disabled = false;
+      }
+    });
+  }
+
+  const restartBtn = document.getElementById("btn-update-restart");
+  if (restartBtn) {
+    restartBtn.addEventListener("click", async () => {
+      restartBtn.disabled = true;
+      restartBtn.textContent = "Restarting...";
+      try {
+        await fetch("/api/update/restart", { method: "POST" });
+      } catch (e) {}
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    });
+  }
+}
+
 document.getElementById("btn-refresh").addEventListener("click", () => {
   loadSystemStatus();
   loadAppConfig();
@@ -2107,6 +2311,7 @@ document.getElementById("btn-refresh").addEventListener("click", () => {
   loadFoundVaults();
   loadInitialOnlineGames();
   initTelemetryUI();
+  checkForUpdates(false);
   log("Refreshed status.");
 });
 
@@ -2122,3 +2327,5 @@ autoDetectUsbDrives();
 loadFoundVaults();
 loadInitialOnlineGames();
 initTelemetryUI();
+initUpdaterUI();
+checkForUpdates(false);
