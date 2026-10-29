@@ -358,6 +358,33 @@ func LocateHeroicPrefix(gameName, appID string) string {
 				return cand2
 			}
 		}
+
+		// Also perform fuzzy / case-insensitive search across directory entries in base
+		if entries, err := os.ReadDir(base); err == nil {
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				eName := e.Name()
+				for _, name := range names {
+					if name == "" {
+						continue
+					}
+					if strings.EqualFold(eName, name) ||
+						strings.EqualFold(cleanGameTitle(eName), cleanGameTitle(name)) ||
+						strings.EqualFold(sanitizeID(eName), sanitizeID(name)) {
+						cand1 := filepath.Join(base, eName, "pfx", "drive_c")
+						if stat, err := os.Stat(cand1); err == nil && stat.IsDir() {
+							return cand1
+						}
+						cand2 := filepath.Join(base, eName, "drive_c")
+						if stat, err := os.Stat(cand2); err == nil && stat.IsDir() {
+							return cand2
+						}
+					}
+				}
+			}
+		}
 	}
 	return ""
 }

@@ -1,4 +1,4 @@
-//go:build !windows && (nowebview || !linux)
+//go:build (!windows && !cgo) || (nowebview && !windows) || (!windows && !linux)
 
 package main
 

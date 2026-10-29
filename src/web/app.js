@@ -1195,7 +1195,8 @@ document.getElementById("btn-backup").addEventListener("click", async () => {
     return;
   }
 
-  log(`Starting backup of ${selectedGames.length} games to ${destPath}...`);
+  const optRPG = document.getElementById("chk-optimize-rpg") ? document.getElementById("chk-optimize-rpg").checked : true;
+  log(`Starting backup of ${selectedGames.length} games to ${destPath} (Smart RPG Optimizer: ${optRPG ? "ON" : "OFF"})...`);
   startBackupProgress(`Backing up ${selectedGames.length} games...`);
 
   try {
@@ -1206,6 +1207,7 @@ document.getElementById("btn-backup").addEventListener("click", async () => {
         games: selectedGames,
         dest_dir: destPath,
         create_single_zip: true,
+        optimize_rpg: optRPG,
       }),
     });
     const result = await res.json();
@@ -1311,6 +1313,14 @@ if (document.getElementById("chk-skip-user-settings")) {
       }
     });
     updateDiskSpaceBadge();
+  });
+}
+
+// Toggle Smart RPG Optimizer
+const chkOptimizeRPG = document.getElementById("chk-optimize-rpg");
+if (chkOptimizeRPG) {
+  chkOptimizeRPG.addEventListener("change", (e) => {
+    log(`Smart RPG Save Optimizer: ${e.target.checked ? "Enabled (prunes bloated autosaves/quicksaves)" : "Disabled (preserves all files)"}`);
   });
 }
 
