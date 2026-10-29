@@ -57,7 +57,8 @@ type ExportReportRequest struct {
 
 func main() {
 	InitLogger()
-	Log("Checkpoint starting up (v1.0.0)...")
+	CleanupOldBinary()
+	Log("Checkpoint starting up (v%s)...", AppVersion)
 
 	versionFlag := flag.Bool("v", false, "Show version and exit")
 	versionLongFlag := flag.Bool("version", false, "Show version and exit")
@@ -68,7 +69,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag || *versionLongFlag {
-		fmt.Println("Checkpoint v1.0.0")
+		fmt.Printf("Checkpoint v%s\n", AppVersion)
 		return
 	}
 
@@ -450,6 +451,74 @@ func main() {
 			"saved_bytes":      totalSaved,
 			"optimized_bytes":  totalOriginal - totalSaved,
 		})
+	})
+
+	// Application update check
+	mux.HandleFunc("/api/update/check", func(w http.ResponseWriter, r *http.Request) {
+		force := r.URL.Query().Get("force") == "true"
+		info, err := CheckForUpdates(force)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{
+				"error":           err.Error(),
+				"current_version": AppVersion,
+			})
+			return
+		}
+		writeJSON(w, info)
+	})
+
+	// Download and apply application update
+	mux.HandleFunc("/api/update/apply", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			DownloadURL string `json:"download_url"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, map[string]string{"error": err.Error()})
+			return
+		}
+		if req.DownloadURL == "" {
+			writeJSON(w, map[string]string{"error": "Download URL is required"})
+			return
+		}
+
+		SetProgress("update", 5.0, "Initiating update download...", 0, 100, "")
+		err := ApplyUpdate(req.DownloadURL, func(pct float64, msg string) {
+			SetProgress("update", pct, msg, int(pct), 100, "")
+		})
+		if err != nil {
+			ClearProgress("Update failed: " + err.Error())
+			writeJSON(w, map[string]string{"error": err.Error()})
+			return
+		}
+
+		ClearProgress("Update installed successfully.")
+		writeJSON(w, map[string]string{
+			"status":  "applied",
+			"message": "Update installed successfully. Restart the application to apply changes.",
+		})
+	})
+
+	// Restart application after update
+	mux.HandleFunc("/api/update/restart", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		writeJSON(w, map[string]string{"status": "restarting"})
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			execPath, err := os.Executable()
+			if err == nil {
+				execPath, _ = filepath.EvalSymlinks(execPath)
+				cmd := exec.Command(execPath)
+				_ = cmd.Start()
+			}
+			os.Exit(0)
+		}()
 	})
 
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
