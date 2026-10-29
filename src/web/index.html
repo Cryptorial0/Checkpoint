@@ -51,7 +51,7 @@
     <section id="restore-content">
       <div class="card">
         <div class="card-title">Select Backup Vault Archive</div>
-        <p class="description">Select a <code>game_saves_bundle.zip</code> archive or uncompressed vault folder created by Checkpoint.</p>
+        <p class="description">Select a <code>game_saves_bundle.zip</code> archive or uncompressed vault folder to inspect and restore game saves.</p>
 
         <!-- Drag & Drop Zone -->
         <div id="vault-drop-zone" class="drop-zone">
@@ -61,16 +61,16 @@
         </div>
 
         <div class="input-row">
-          <label for="vault-path">Vault Archive Path (.zip or folder):</label>
-          <div class="input-group">
-            <input type="text" id="vault-path" placeholder="Click Browse to select game_saves_bundle.zip...">
-            <button id="btn-browse-vault" class="btn-subtle" type="button">Browse (.zip)...</button>
-            <button id="btn-inspect-vault" class="btn-primary" type="button">
-              <span id="inspect-spinner" class="spinner hidden"></span>
-              <span id="inspect-btn-text">Inspect Vault</span>
-            </button>
+            <label for="vault-path">Vault Archive Path (.zip or folder):</label>
+            <div class="input-group">
+              <input type="text" id="vault-path" placeholder="Click Browse to select game_saves_bundle.zip...">
+              <button id="btn-browse-vault" class="btn-subtle" type="button">Browse (.zip)...</button>
+              <button id="btn-inspect-vault" class="btn-primary" type="button">
+                <span id="inspect-spinner" class="spinner hidden"></span>
+                <span id="inspect-btn-text">Inspect Vault</span>
+              </button>
+            </div>
           </div>
-        </div>
 
         <!-- Quick Load Chips for Found Bundles -->
         <div id="quick-load-container" class="quick-load-bar hidden">
@@ -219,6 +219,9 @@
               <label style="font-size: 12px; color: #8b949e; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: 6px;">
                 <input type="checkbox" id="chk-telemetry-share"> Share anonymous detection report
               </label>
+              <label style="font-size: 12px; color: #58a6ff; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: 6px; font-weight: 500;" title="Keeps all named manual saves and latest 5 quicksaves for Baldur's Gate 3, Starfield, Cyberpunk 2077, shrinking gigabytes of bloat">
+                <input type="checkbox" id="chk-optimize-rpg" checked> Smart RPG Optimizer
+              </label>
             </div>
             <div style="display: flex; gap: 8px;">
               <button id="btn-copy-report" class="btn-subtle" style="font-size: 12px; padding: 5px 12px;" type="button">Copy Report</button>
@@ -287,7 +290,9 @@
 
           <div id="backup-verify-card" class="alert alert-info hidden" style="margin-bottom: 14px;"></div>
 
-          <button id="btn-backup" class="btn-primary" disabled>Start Backup</button>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button id="btn-backup" class="btn-primary" disabled>Start Backup (Local)</button>
+          </div>
         </div>
       </div>
     </section>
