@@ -11,25 +11,25 @@
 <p align="center">
   <a href="https://ko-fi.com/cryptorial"><img src="https://img.shields.io/badge/Support%20on%20Ko--fi-2ea043?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" alt="License: GPL v3"></a>
-  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v1.0.0-00d2aa?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v1.1.0-00d2aa?style=for-the-badge" alt="Release"></a>
 </p>
 
-Migration tool for PC game saves, offline Steam emulators, and console memory cards. Discovers where your games store progress, packages them into a portable vault archive, and seamlessly restores them across supported environments (**Windows ➔ Linux / Steam Deck**, **Windows ➔ Windows**, and **Linux ➔ Linux**) into the correct folders, Wine prefixes, and Proton prefixes.
+Migration tool for PC game saves, offline Steam emulators, and console memory cards. Discovers where your games store progress, packages them into a portable vault archive, and seamlessly restores them across supported environments (**Windows -> Linux / Steam Deck**, **Windows -> Windows**, and **Linux -> Linux**) into the correct folders, Wine prefixes, and Proton prefixes.
 
 > [!NOTE]
 > **Linux to Windows migration is purposely not supported.** Checkpoint focuses on enabling migration from Windows to Linux / Steam Deck, PC upgrades between Windows machines, and transferring saves across Linux systems.
 
 Launches a standalone desktop interface on Windows and Linux, or drops into a command line interface for headless scripts.
 
-## Releases & Downloads (v1.0.0)
+## Releases & Downloads (v1.1.0)
 
-Pre-built binaries for **Release 1.0.0**:
+Pre-built binaries for **Release 1.1.0**:
 
 | Platform | Package | Description | Binary |
 | :--- | :--- | :--- | :--- |
-| **Linux** | **AppImage** | Standalone portable bundle (runs on all Linux distributions) | [checkpoint-v1.0.0.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.0.0/checkpoint-v1.0.0.AppImage) |
-| **Linux** | **Binary** | Native 64-bit ELF executable | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.0.0/checkpoint) |
-| **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.0.0/checkpoint.exe) |
+| **Linux** | **AppImage** | Standalone portable bundle (runs on all Linux distributions) | [checkpoint-v1.1.0.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.0/checkpoint-v1.1.0.AppImage) |
+| **Linux** | **Binary** | Native 64-bit ELF executable | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.0/checkpoint) |
+| **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.0/checkpoint.exe) |
 
 > [!NOTE]
 > All binary artifacts and checksums are published on the [GitHub Releases](https://github.com/Cryptorial0/Checkpoint/releases) page. 
@@ -110,8 +110,13 @@ Detects installed online multiplayer games with server-side progress and display
 
 ## Release Highlights
 
-- **v1.0.0 (Current):**
-  - **Multi-Directional Migration:** Seamless game save migration across Windows ➔ Linux / Steam Deck, Windows ➔ Windows, and Linux ➔ Linux (Linux to Windows migration is purposely not supported).
+- **v1.1.0 (Current):**
+  - **In-App Auto-Updater:** Built-in updater engine querying official GitHub Releases with rate-limit protection, atomic binary replacement on POSIX/Linux, and safe running-executable migration on Windows.
+  - **Smart RPG Save Optimizer:** Automatically prunes bloated, redundant autosaves and quicksaves for large RPGs (Baldur's Gate 3, Starfield, Cyberpunk 2077, Skyrim, Fallout 4, The Witcher 3) while strictly preserving 100% of named manual checkpoints.
+  - **Heroic and Custom Prefix Auto-Discovery:** Seamlessly scans custom Wine/Proton directories and resolves game titles by executable name or AppID.
+
+- **v1.0.0:**
+  - **Multi-Directional Migration:** Seamless game save migration across Windows -> Linux / Steam Deck, Windows -> Windows, and Linux -> Linux (Linux to Windows migration is purposely not supported).
   - **Native Linux Host Backup Scanner:** Checkpoint can now scan and backup save files natively on Linux and SteamOS directly from Steam Proton prefixes (`compatdata`), Hydra launcher prefixes, Heroic Games Launcher, Lutris, and EmuDeck emulators.
   - **Uninitialized Wine Prefix Auto-Seeding:** Seamlessly pre-seeds uninitialized Wine/Proton prefixes on Linux with proper user directories and registry keys on demand.
   - **High-Precision Machine Correlation:** Strict multi-criteria scoring prevents false positive folder matches between game saves.
