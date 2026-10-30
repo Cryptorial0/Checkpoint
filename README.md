@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://ko-fi.com/cryptorial"><img src="https://img.shields.io/badge/Support%20on%20Ko--fi-2ea043?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" alt="License: GPL v3"></a>
-  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v1.1.0-00d2aa?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v1.1.1-00d2aa?style=for-the-badge" alt="Release"></a>
 </p>
 
 Migration tool for PC game saves, offline Steam emulators, and console memory cards. Discovers where your games store progress, packages them into a portable vault archive, and seamlessly restores them across supported environments (**Windows -> Linux / Steam Deck**, **Windows -> Windows**, and **Linux -> Linux**) into the correct folders, Wine prefixes, and Proton prefixes.
@@ -21,15 +21,15 @@ Migration tool for PC game saves, offline Steam emulators, and console memory ca
 
 Launches a standalone desktop interface on Windows and Linux, or drops into a command line interface for headless scripts.
 
-## Releases & Downloads (v1.1.0)
+## Releases & Downloads (v1.1.1)
 
-Pre-built binaries for **Release 1.1.0**:
+Pre-built binaries for **Release 1.1.1**:
 
 | Platform | Package | Description | Binary |
 | :--- | :--- | :--- | :--- |
-| **Linux** | **AppImage** | Standalone portable bundle (runs on all Linux distributions) | [checkpoint-v1.1.0.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.0/checkpoint-v1.1.0.AppImage) |
-| **Linux** | **Binary** | Native 64-bit ELF executable | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.0/checkpoint) |
-| **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.0/checkpoint.exe) |
+| **Linux** | **AppImage** | Standalone portable bundle (runs on all Linux distributions) | [checkpoint-v1.1.1.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.1/checkpoint-v1.1.1.AppImage) |
+| **Linux** | **Binary** | Native 64-bit ELF executable | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.1/checkpoint) |
+| **Windows** | **Executable** | Standalone 64-bit Windows portable application | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.1.1/checkpoint.exe) |
 
 > [!NOTE]
 > All binary artifacts and checksums are published on the [GitHub Releases](https://github.com/Cryptorial0/Checkpoint/releases) page. 
@@ -107,10 +107,14 @@ Detects installed online multiplayer games with server-side progress and display
 - Single Archive: Saves are packaged into a single `game_saves_bundle.zip` archive with CRC32 integrity verification and metadata.
 - Filesystem Casing Resolver: Linux filesystems (ext4, btrfs) are case-sensitive while Windows is not. Checkpoint walks destination directories case-insensitively so save files land in the folders games expect without manual renaming.
 - Steam Cloud Timestamp Protection: Updates modified timestamps during restore to prevent Steam Cloud from overwriting your restored saves with older cloud files when launching a game for the first time.
+- Conflict Prevention & Timestamp Diffing: Compares archive backup timestamps against existing local save files on the target machine. If a newer local save is detected, Checkpoint flags it, unchecks it by default, and offers granular conflict actions (Skip, Backup Local, or Overwrite).
 
 ## Release Highlights
 
-- **v1.1.0 (Current):**
+- **v1.1.1 (Current):**
+  - **Conflict Prevention & Timestamp Diffing:** Compares destination files against archive timestamps to prevent accidental overwrite of newer local save progress during migration, with automated safety backups.
+
+- **v1.1.0:**
   - **In-App Auto-Updater:** Built-in updater engine querying official GitHub Releases with rate-limit protection, atomic binary replacement on POSIX/Linux, and safe running-executable migration on Windows.
   - **Smart RPG Save Optimizer:** Automatically prunes bloated, redundant autosaves and quicksaves for large RPGs (Baldur's Gate 3, Starfield, Cyberpunk 2077, Skyrim, Fallout 4, The Witcher 3) while strictly preserving 100% of named manual checkpoints.
   - **Heroic and Custom Prefix Auto-Discovery:** Seamlessly scans custom Wine/Proton directories and resolves game titles by executable name or AppID.

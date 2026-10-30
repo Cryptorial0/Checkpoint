@@ -42,8 +42,9 @@ type InspectRequest struct {
 }
 
 type RestoreTask struct {
-	Meta      GameSaveMeta `json:"meta"`
-	CustomDir string       `json:"custom_dir"`
+	Meta               GameSaveMeta `json:"meta"`
+	CustomDir          string       `json:"custom_dir"`
+	ConflictResolution string       `json:"conflict_resolution,omitempty"`
 }
 
 type RestoreRequest struct {
@@ -600,7 +601,7 @@ func main() {
 			}
 			SetProgress("restore", pct, status, i+1, total, detail)
 
-			rep := RestoreGame(req.SourcePath, task.Meta, task.CustomDir)
+			rep := RestoreGame(req.SourcePath, task.Meta, task.CustomDir, task.ConflictResolution)
 			reports = append(reports, rep)
 			if rep.Success {
 				restoredGames = append(restoredGames, task.Meta)
@@ -798,7 +799,7 @@ func runCLIRestore(vaultPath string, auto bool) {
 			continue
 		}
 		fmt.Printf(" -> Restoring %s to %s ... ", g.GameName, g.SuggestedLinuxPath)
-		report := RestoreGame(vaultPath, g, g.SuggestedLinuxPath)
+		report := RestoreGame(vaultPath, g, g.SuggestedLinuxPath, "")
 		if report.Success {
 			fmt.Println("SUCCESS")
 			successCount++

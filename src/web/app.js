@@ -1713,14 +1713,39 @@ function renderRestoreResults(games) {
     const browseBtnText = isWindows ? "Change Folder..." : "Change Prefix...";
     const placeholderText = isWindows ? "Click Change Folder to select destination..." : "Click Change Prefix to select prefix...";
 
+    const hasConflict = !!game.has_local_conflict;
+    let conflictHtml = "";
+    if (hasConflict) {
+      conflictHtml = `
+        <div class="conflict-notice-row" style="margin-top: 8px; padding: 6px 10px; background: rgba(210, 153, 34, 0.15); border-left: 3px solid #d29922; border-radius: 4px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+            <div style="font-size: 11px; color: #f2cc60; font-weight: 500;">
+              Notice: ${escapeHtml(game.conflict_notice || "Local save is newer than archive")}
+            </div>
+            <div style="display: inline-flex; align-items: center; gap: 6px;">
+              <label for="conflict-action-${idx}" style="font-size: 11px; color: #c9d1d9;">Action:</label>
+              <select id="conflict-action-${idx}" class="launcher-select" style="font-size: 11px; padding: 2px 20px 2px 6px;">
+                <option value="skip" selected>Skip (Keep Newer Local)</option>
+                <option value="backup_local">Backup Local and Overwrite</option>
+                <option value="overwrite">Overwrite Local Save</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    const isChecked = hasConflict ? "" : "checked";
+
     item.innerHTML = `
-      <input type="checkbox" id="restore-chk-${idx}" class="restore-game-chk" style="margin-top: 6px; cursor: pointer;">
+      <input type="checkbox" id="restore-chk-${idx}" class="restore-game-chk" ${isChecked} style="margin-top: 6px; cursor: pointer;">
       ${iconHtml}
       <div class="game-info">
         <div class="game-title-row" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           <span style="font-weight: 600; font-size: 14px; color: #f0f6fc;">${escapeHtml(game.game_name)}</span>
           ${game.appid ? `<span class="appid-badge">Steam AppID: ${game.appid}</span>` : ""}
           ${protonBadgeHtml}
+          ${hasConflict ? `<span class="badge" style="background: #d29922; color: #0d1117; font-weight: bold; border-color: #d29922; font-size: 10px;">Local Save is Newer</span>` : ""}
           <span id="restore-status-${idx}" class="status-badge ${statusClass}" style="margin-left: auto;">${escapeHtml(statusBadgeText)}</span>
         </div>
 
@@ -1738,6 +1763,7 @@ function renderRestoreResults(games) {
           <button id="btn-browse-target-${idx}" class="btn-subtle btn-mini" type="button" style="font-size: 11px; padding: 2px 8px;">${browseBtnText}</button>
           ${isUninit ? `<button id="btn-seed-target-${idx}" class="btn-subtle btn-mini" type="button" style="font-size: 11px; padding: 2px 8px; color: #f2cc60; border-color: #d29922;" title="Select and pre-create Wine prefix on restore">Pre-Seed</button>` : ""}
         </div>
+        ${conflictHtml}
       </div>
     `;
 
@@ -1903,9 +1929,12 @@ if (btnStartRestore) {
       if (chk && chk.checked) {
         const inp = document.getElementById(`restore-target-${idx}`);
         const customDir = inp ? inp.value.trim() : (g.suggested_linux_path || "");
+        const actionEl = document.getElementById(`conflict-action-${idx}`);
+        const conflictAction = actionEl ? actionEl.value : (g.has_local_conflict ? "skip" : "overwrite");
         tasks.push({
           meta: g,
-          custom_dir: customDir
+          custom_dir: customDir,
+          conflict_resolution: conflictAction
         });
       }
     });
@@ -1913,6 +1942,15 @@ if (btnStartRestore) {
     if (tasks.length === 0) {
       alert("Please select at least one game save to restore.");
       return;
+    }
+
+    const overwriteConflicts = tasks.filter(t => t.meta.has_local_conflict && t.conflict_resolution === "overwrite");
+    if (overwriteConflicts.length > 0) {
+      const names = overwriteConflicts.map(t => t.meta.game_name).join(", ");
+      const confirmed = confirm(`Notice: The following titles have newer local saves on this machine:\n\n${names}\n\nOverwriting will replace your newer local progress with older backup saves. Proceed with overwrite?`);
+      if (!confirmed) {
+        return;
+      }
     }
 
     btnStartRestore.disabled = true;
@@ -1960,10 +1998,22 @@ if (btnStartRestore) {
       btnStartRestore.disabled = false;
 
       let successCount = 0;
+      let skippedCount = 0;
       let failCount = 0;
 
       reports.forEach(r => {
-        if (r.success) {
+        if (r.skipped) {
+          skippedCount++;
+          log(`Skipped ${r.game_name}: ${r.message || "Preserved newer local save"}`);
+          const cardIdx = vaultGames.findIndex(g => g.id === r.game_id || g.game_name === r.game_name);
+          if (cardIdx !== -1) {
+            const badge = document.getElementById(`restore-status-${cardIdx}`);
+            if (badge) {
+              badge.className = "status-badge status-badge-warning";
+              badge.textContent = "Skipped (Newer Local Preserved)";
+            }
+          }
+        } else if (r.success) {
           successCount++;
           log(`Restored ${r.game_name} -> ${r.target_resolved} (Steam Cloud Timestamp Protected)`);
           const cardIdx = vaultGames.findIndex(g => g.id === r.game_id || g.game_name === r.game_name);
@@ -1973,10 +2023,10 @@ if (btnStartRestore) {
               const origText = badge.textContent || "";
               if (origText.includes("Uninitialized") || origText.includes("Auto-seed")) {
                 badge.className = "status-badge status-badge-seeded";
-                badge.textContent = "✓ Prefix Pre-Created & Restored";
+                badge.textContent = "Prefix Pre-Created & Restored";
               } else {
                 badge.className = "status-badge status-badge-proton";
-                badge.textContent = "✓ Restored";
+                badge.textContent = "Restored";
               }
             }
           }
