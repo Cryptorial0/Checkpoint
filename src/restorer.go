@@ -22,6 +22,8 @@ type RestoreReport struct {
 	GameName       string `json:"game_name"`
 	TargetResolved string `json:"target_resolved"`
 	Success        bool   `json:"success"`
+	Skipped        bool   `json:"skipped,omitempty"`
+	Message        string `json:"message,omitempty"`
 	Error          string `json:"error,omitempty"`
 }
 
@@ -126,6 +128,16 @@ func enrichManifest(manifest *VaultManifest) {
 				if autoPath != "" {
 					g.SuggestedLinuxPath = autoPath
 				}
+			}
+
+			// Check for save conflicts (local save exists and is newer than archive)
+			targetDest := g.SuggestedLinuxPath
+			if targetDest != "" {
+				hasConflict, localTime, archiveTime, notice := checkLocalSaveConflict(targetDest, g.BackupDate)
+				g.HasLocalConflict = hasConflict
+				g.LocalModTime = localTime
+				g.ArchiveModTime = archiveTime
+				g.ConflictNotice = notice
 			}
 		}(i)
 	}
@@ -1152,7 +1164,7 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 }
 
 // RestoreGame restores a single game save from an extracted folder or zip archive
-func RestoreGame(sourcePath string, meta GameSaveMeta, customDestDir string) RestoreReport {
+func RestoreGame(sourcePath string, meta GameSaveMeta, customDestDir string, conflictResolution string) RestoreReport {
 	report := RestoreReport{
 		GameID:   meta.ID,
 		GameName: meta.GameName,
@@ -1181,7 +1193,7 @@ func RestoreGame(sourcePath string, meta GameSaveMeta, customDestDir string) Res
 			TargetRelativePath: meta.TargetRelativePath,
 			LinuxResolvedPath:  targetDir,
 			SaveType:           string(meta.SaveType),
-			StorageType:          meta.StorageType,
+			StorageType:        meta.StorageType,
 		})
 		_ = SaveConfig(cfg)
 	} else {
@@ -1207,6 +1219,24 @@ func RestoreGame(sourcePath string, meta GameSaveMeta, customDestDir string) Res
 	}
 
 	report.TargetResolved = targetDir
+
+	// Handle Conflict Resolution choices
+	if conflictResolution == "skip" {
+		report.Success = true
+		report.Skipped = true
+		report.Message = "Skipped to preserve newer local save"
+		Log("Skipping restore for %s: preserving newer local save at %s", meta.GameName, targetDir)
+		return report
+	}
+
+	if conflictResolution == "backup_local" {
+		if stat, err := os.Stat(targetDir); err == nil && stat.IsDir() {
+			backupDir := fmt.Sprintf("%s.checkpoint_bak_%s", targetDir, time.Now().Format("20060102_150405"))
+			if err := copyDir(targetDir, backupDir); err == nil {
+				Log("Created safety backup of existing local save directory for %s at: %s", meta.GameName, backupDir)
+			}
+		}
+	}
 
 	// Extract data.tar.gz into targetDir
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
@@ -1274,6 +1304,128 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Sync()
+}
+
+// copyDir recursively duplicates a directory tree
+func copyDir(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// findNewestFileModTime traverses a directory and returns the newest modification time among regular files
+func findNewestFileModTime(targetDir string) (time.Time, bool) {
+	stat, err := os.Stat(targetDir)
+	if err != nil || !stat.IsDir() {
+		return time.Time{}, false
+	}
+
+	var newest time.Time
+	hasFiles := false
+
+	_ = filepath.Walk(targetDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil {
+			return nil
+		}
+		if !info.IsDir() {
+			hasFiles = true
+			if info.ModTime().After(newest) {
+				newest = info.ModTime()
+			}
+		}
+		return nil
+	})
+
+	return newest, hasFiles
+}
+
+// formatTimeDifference returns a human-readable duration description
+func formatTimeDifference(diff time.Duration) string {
+	if diff < time.Minute {
+		return "less than a minute"
+	}
+	if diff < time.Hour {
+		mins := int(diff.Minutes())
+		if mins == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", mins)
+	}
+	if diff < 24*time.Hour {
+		hours := int(diff.Hours())
+		if hours == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", hours)
+	}
+	days := int(diff.Hours() / 24)
+	if days == 1 {
+		return "1 day"
+	}
+	return fmt.Sprintf("%d days", days)
+}
+
+// checkLocalSaveConflict inspects target destination files and compares timestamps against the backup date
+func checkLocalSaveConflict(targetDir string, backupDateStr string) (hasConflict bool, localTimeStr string, archiveTimeStr string, notice string) {
+	if targetDir == "" {
+		return false, "", "", ""
+	}
+
+	newestLocal, hasFiles := findNewestFileModTime(targetDir)
+	if !hasFiles {
+		return false, "", "", ""
+	}
+
+	localTimeStr = newestLocal.Format("2006-01-02 15:04")
+
+	var archiveTime time.Time
+	if backupDateStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, backupDateStr); err == nil {
+			archiveTime = parsed
+		} else if parsed, err := time.Parse("2006-01-02 15:04:05", backupDateStr); err == nil {
+			archiveTime = parsed
+		}
+	}
+
+	if archiveTime.IsZero() {
+		return false, localTimeStr, "", ""
+	}
+
+	archiveTimeStr = archiveTime.Format("2006-01-02 15:04")
+
+	// If the local file is more than 2 minutes newer than the backup date, flag a conflict
+	if newestLocal.After(archiveTime.Add(2 * time.Minute)) {
+		diff := newestLocal.Sub(archiveTime)
+		notice = fmt.Sprintf("Local save is newer by %s (played %s vs backup %s)", formatTimeDifference(diff), localTimeStr, archiveTimeStr)
+		return true, localTimeStr, archiveTimeStr, notice
+	}
+
+	return false, localTimeStr, archiveTimeStr, ""
 }
 
 // extractTarGz extracts a .tar.gz archive with path traversal checks and automatic backup

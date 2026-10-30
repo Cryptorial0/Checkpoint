@@ -40,6 +40,10 @@ type GameSaveMeta struct {
 	SelectedLauncher   string            `json:"selected_launcher,omitempty"`
 	LauncherPaths      map[string]string `json:"launcher_paths,omitempty"`
 	LauncherStatuses   map[string]string `json:"launcher_statuses,omitempty"`
+	HasLocalConflict   bool              `json:"has_local_conflict"`
+	LocalModTime       string            `json:"local_mod_time,omitempty"`
+	ArchiveModTime     string            `json:"archive_mod_time,omitempty"`
+	ConflictNotice     string            `json:"conflict_notice,omitempty"`
 }
 
 func CreateBackup(games []DetectedGame, destDir string, createSingleZip bool) (*VaultManifest, error) {
