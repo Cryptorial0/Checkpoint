@@ -107,10 +107,35 @@ func parseVersionSegments(v string) []int {
 	return segments
 }
 
+// isRunningAsAppImage detects if the application is running packaged as an AppImage on Linux
+func isRunningAsAppImage() (bool, string) {
+	if runtime.GOOS != "linux" {
+		return false, ""
+	}
+	appImage := os.Getenv("APPIMAGE")
+	if appImage != "" {
+		return true, appImage
+	}
+	execPath, err := os.Executable()
+	if err == nil {
+		if strings.Contains(execPath, "/.mount_") || strings.HasPrefix(execPath, "/tmp/.mount_") {
+			if argv0 := os.Getenv("ARGV0"); argv0 != "" {
+				if _, statErr := os.Stat(argv0); statErr == nil {
+					return true, argv0
+				}
+			}
+			return true, ""
+		}
+	}
+	return false, ""
+}
+
 // findMatchingAsset selects the binary artifact matching the host operating system and architecture
 func findMatchingAsset(assets []ReleaseAsset) (ReleaseAsset, error) {
 	osName := runtime.GOOS
 	arch := runtime.GOARCH
+
+	isAppImg, _ := isRunningAsAppImage()
 
 	for _, asset := range assets {
 		name := strings.ToLower(asset.Name)
@@ -122,8 +147,28 @@ func findMatchingAsset(assets []ReleaseAsset) (ReleaseAsset, error) {
 				}
 			}
 		} else if osName == "linux" {
-			if !strings.HasSuffix(name, ".exe") && !strings.HasSuffix(name, ".zip") {
-				if strings.Contains(name, "appimage") || strings.Contains(name, "linux") || name == "checkpoint" {
+			if strings.HasSuffix(name, ".exe") || strings.HasSuffix(name, ".zip") || strings.HasSuffix(name, ".txt") {
+				continue
+			}
+
+			if isAppImg {
+				if strings.HasSuffix(name, ".appimage") {
+					return asset, nil
+				}
+			} else {
+				if !strings.HasSuffix(name, ".appimage") && (name == "checkpoint" || strings.Contains(name, "linux")) {
+					return asset, nil
+				}
+			}
+		}
+	}
+
+	// Fallback for Linux if preferred flavor was not matched
+	if osName == "linux" {
+		for _, asset := range assets {
+			name := strings.ToLower(asset.Name)
+			if !strings.HasSuffix(name, ".exe") && !strings.HasSuffix(name, ".zip") && !strings.HasSuffix(name, ".txt") {
+				if strings.HasSuffix(name, ".appimage") || name == "checkpoint" {
 					return asset, nil
 				}
 			}
@@ -208,13 +253,20 @@ func CheckForUpdates(force bool) (*UpdateInfo, error) {
 
 // CleanupOldBinary removes leftover backup binaries from previous updates (Windows .old files)
 func CleanupOldBinary() {
-	execPath, err := os.Executable()
-	if err != nil {
-		return
-	}
-	execPath, err = filepath.EvalSymlinks(execPath)
-	if err != nil {
-		return
+	var execPath string
+	isAppImg, appImgPath := isRunningAsAppImage()
+	if isAppImg && appImgPath != "" {
+		execPath = appImgPath
+	} else {
+		var err error
+		execPath, err = os.Executable()
+		if err != nil {
+			return
+		}
+		execPath, err = filepath.EvalSymlinks(execPath)
+		if err != nil {
+			return
+		}
 	}
 	oldPath := execPath + ".old"
 	if _, err := os.Stat(oldPath); err == nil {
@@ -228,21 +280,39 @@ func ApplyUpdate(downloadURL string, progressCallback func(percent float64, mess
 		return errors.New("empty download URL")
 	}
 
-	currentExec, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("unable to determine current executable path: %w", err)
+	var currentExec string
+	isAppImg, appImgPath := isRunningAsAppImage()
+	if isAppImg {
+		if appImgPath == "" {
+			return errors.New("cannot auto-update AppImage: APPIMAGE environment variable is missing, please download the latest AppImage from GitHub Releases")
+		}
+		currentExec = appImgPath
+	} else {
+		exec, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("unable to determine current executable path: %w", err)
+		}
+		exec, err = filepath.EvalSymlinks(exec)
+		if err != nil {
+			return fmt.Errorf("unable to resolve executable path: %w", err)
+		}
+		currentExec = exec
 	}
-	currentExec, err = filepath.EvalSymlinks(currentExec)
-	if err != nil {
-		return fmt.Errorf("unable to resolve executable path: %w", err)
+
+	// Guard against read-only squashfs mount paths if APPIMAGE was missing
+	if runtime.GOOS == "linux" && (strings.Contains(currentExec, "/.mount_") || strings.HasPrefix(currentExec, "/tmp/.mount_")) {
+		return errors.New("cannot write update into read-only AppImage mount path; please download the latest release")
 	}
 
 	execDir := filepath.Dir(currentExec)
 
-	// Download to a temporary file in the same directory to permit an atomic rename
+	// Try creating temp file in execDir first (for atomic rename). Fall back to os.TempDir() if execDir is read-only.
 	tempFile, err := os.CreateTemp(execDir, "checkpoint_update_*.tmp")
 	if err != nil {
-		return fmt.Errorf("failed creating temporary update file: %w", err)
+		tempFile, err = os.CreateTemp(os.TempDir(), "checkpoint_update_*.tmp")
+		if err != nil {
+			return fmt.Errorf("failed creating temporary update file: %w", err)
+		}
 	}
 	tempPath := tempFile.Name()
 	defer func() {
@@ -310,32 +380,70 @@ func ApplyUpdate(downloadURL string, progressCallback func(percent float64, mess
 		progressCallback(95.0, "Applying updated binary...")
 	}
 
-	// Replacement logic per operating system
-	if runtime.GOOS == "windows" {
-		// Windows locks running binaries against write access, but permits renaming open files.
-		// We rename the running executable to .old, then place the new binary at the original path.
-		oldPath := currentExec + ".old"
-		_ = os.Remove(oldPath)
-
-		if err := os.Rename(currentExec, oldPath); err != nil {
-			return fmt.Errorf("failed renaming current executable: %w", err)
-		}
-
-		if err := os.Rename(tempPath, currentExec); err != nil {
-			// Roll back original executable if moving the new one fails
-			_ = os.Rename(oldPath, currentExec)
-			return fmt.Errorf("failed placing new binary in position: %w", err)
-		}
-	} else {
-		// On Linux and POSIX systems, rename unlinks the old file inode atomically
-		if err := os.Rename(tempPath, currentExec); err != nil {
-			return fmt.Errorf("failed replacing executable: %w", err)
-		}
+	if err := replaceExecutable(tempPath, currentExec); err != nil {
+		return err
 	}
 
 	if progressCallback != nil {
 		progressCallback(100.0, "Update installed successfully.")
 	}
 
+	return nil
+}
+
+// replaceExecutable swaps the current running binary on disk with the new binary payload
+func replaceExecutable(tempPath, targetPath string) error {
+	if runtime.GOOS == "windows" {
+		// Windows locks running binaries against write access, but permits renaming open files.
+		// We rename the running executable to .old, then place the new binary at the original path.
+		oldPath := targetPath + ".old"
+		_ = os.Remove(oldPath)
+
+		if err := os.Rename(targetPath, oldPath); err != nil {
+			return fmt.Errorf("failed renaming current executable: %w", err)
+		}
+
+		if err := os.Rename(tempPath, targetPath); err != nil {
+			_ = os.Rename(oldPath, targetPath)
+			return fmt.Errorf("failed placing new binary in position: %w", err)
+		}
+		return nil
+	}
+
+	// On Linux / POSIX:
+	// 1. Try atomic rename first (instant if on the same filesystem)
+	if err := os.Rename(tempPath, targetPath); err == nil {
+		return nil
+	}
+
+	// 2. If atomic rename failed (e.g. EXDEV across filesystems), copy to target.
+	// Unlink target first so open running process does not trigger ETXTBSY.
+	backupPath := targetPath + ".old"
+	_ = os.Remove(backupPath)
+	if err := os.Rename(targetPath, backupPath); err != nil {
+		_ = os.Remove(targetPath)
+	}
+
+	in, err := os.Open(tempPath)
+	if err != nil {
+		_ = os.Rename(backupPath, targetPath)
+		return fmt.Errorf("failed opening downloaded update payload: %w", err)
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		_ = os.Rename(backupPath, targetPath)
+		return fmt.Errorf("failed creating target binary: %w", err)
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		_ = os.Rename(backupPath, targetPath)
+		return fmt.Errorf("failed copying update binary into place: %w", err)
+	}
+	out.Close()
+	_ = os.Remove(backupPath)
 	return nil
 }
