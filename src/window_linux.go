@@ -5,6 +5,7 @@ package main
 /*
 #cgo pkg-config: gtk+-3.0 webkit2gtk-4.1
 #include <stdlib.h>
+#include <stdio.h>
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
 
@@ -13,14 +14,34 @@ static void on_destroy(GtkWidget* widget, gpointer data) {
 }
 
 static int run_gtk_webview(const char* title, const char* url, int width, int height, const void* icon_data, int icon_len) {
+    // 1. Wayland requirement: Set program name and application name before gtk_init_check
+    g_set_prgname("checkpoint");
+    g_set_application_name("Checkpoint");
+
     if (!gtk_init_check(NULL, NULL)) {
         return 0;
     }
+
+    // 2. Add AppDir paths to GTK icon search path if running inside an AppImage
+    const char* appdir = g_getenv("APPDIR");
+    if (appdir) {
+        GtkIconTheme *theme = gtk_icon_theme_get_default();
+        if (theme) {
+            gtk_icon_theme_append_search_path(theme, appdir);
+            char icons_path[1024];
+            snprintf(icons_path, sizeof(icons_path), "%s/usr/share/icons/hicolor", appdir);
+            gtk_icon_theme_append_search_path(theme, icons_path);
+        }
+    }
+
+    // 3. Set default icon name for window decorations and Wayland compositors
+    gtk_window_set_default_icon_name("checkpoint");
 
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), title);
     gtk_window_set_default_size(GTK_WINDOW(window), width, height);
     gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
+    gtk_window_set_icon_name(GTK_WINDOW(window), "checkpoint");
 
     if (icon_data && icon_len > 0) {
         GdkPixbufLoader *loader = gdk_pixbuf_loader_new();
@@ -29,6 +50,7 @@ static int run_gtk_webview(const char* title, const char* url, int width, int he
                 gdk_pixbuf_loader_close(loader, NULL);
                 GdkPixbuf *pix = gdk_pixbuf_loader_get_pixbuf(loader);
                 if (pix) {
+                    gtk_window_set_default_icon(pix);
                     gtk_window_set_icon(GTK_WINDOW(window), pix);
                 }
             } else {
@@ -57,10 +79,30 @@ static int run_gtk_webview(const char* title, const char* url, int width, int he
 */
 import "C"
 import (
+	"os"
+	"path/filepath"
 	"unsafe"
 )
 
+func ensureLinuxDesktopIcon() {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return
+	}
+	iconDir := filepath.Join(home, ".local", "share", "icons", "hicolor", "256x256", "apps")
+	iconPath := filepath.Join(iconDir, "checkpoint.png")
+	if _, err := os.Stat(iconPath); os.IsNotExist(err) {
+		iconBytes, _ := webFiles.ReadFile("web/icon.png")
+		if len(iconBytes) > 0 {
+			_ = os.MkdirAll(iconDir, 0755)
+			_ = os.WriteFile(iconPath, iconBytes, 0644)
+		}
+	}
+}
+
 func runEmbeddedAppWindow(url string) bool {
+	ensureLinuxDesktopIcon()
+
 	cTitle := C.CString("Checkpoint")
 	defer C.free(unsafe.Pointer(cTitle))
 	cUrl := C.CString(url)
