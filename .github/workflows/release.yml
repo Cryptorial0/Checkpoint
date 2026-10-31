@@ -94,13 +94,16 @@ jobs:
           Exec=checkpoint
           Icon=checkpoint
           Categories=Utility;Game;
-          Comment=PC Game Save & Emulator Migration Tool
+          Comment=Game Save Backup & Restore Suite
           Terminal=false
+          StartupWMClass=checkpoint
           EOF
 
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           if [ -f "assets/icon.png" ]; then
             cp assets/icon.png AppDir/checkpoint.png
             cp assets/icon.png AppDir/.DirIcon
+            cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/checkpoint.png
           else
             touch AppDir/checkpoint.png AppDir/.DirIcon
           fi
