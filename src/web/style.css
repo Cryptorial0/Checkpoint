@@ -612,7 +612,7 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
-/* Linux Restorer Enhancements */
+/* Mode Toggle Group */
 .mode-toggle-group {
   display: flex;
   background-color: #21262d;
