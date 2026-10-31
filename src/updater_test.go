@@ -49,3 +49,32 @@ func TestFindMatchingAsset(t *testing.T) {
 		t.Errorf("Expected matched asset to have a valid download URL")
 	}
 }
+
+func TestFindMatchingAssetAppImageSelection(t *testing.T) {
+	assets := []ReleaseAsset{
+		{Name: "checkpoint", BrowserDownloadURL: "https://example.com/checkpoint"},
+		{Name: "checkpoint-v1.1.2.AppImage", BrowserDownloadURL: "https://example.com/checkpoint.AppImage"},
+		{Name: "checkpoint.exe", BrowserDownloadURL: "https://example.com/checkpoint.exe"},
+		{Name: "SHA256SUMS.txt", BrowserDownloadURL: "https://example.com/checksums"},
+	}
+
+	// 1. In AppImage mode: should match .AppImage
+	t.Setenv("APPIMAGE", "/tmp/fake/checkpoint.AppImage")
+	matchedAppImg, err := findMatchingAsset(assets)
+	if err != nil {
+		t.Fatalf("Failed to match asset in AppImage mode: %v", err)
+	}
+	if matchedAppImg.Name != "checkpoint-v1.1.2.AppImage" {
+		t.Errorf("Expected AppImage asset, got %s", matchedAppImg.Name)
+	}
+
+	// 2. In non-AppImage mode: should match native ELF "checkpoint"
+	t.Setenv("APPIMAGE", "")
+	matchedNative, err := findMatchingAsset(assets)
+	if err != nil {
+		t.Fatalf("Failed to match native asset: %v", err)
+	}
+	if matchedNative.Name != "checkpoint" {
+		t.Errorf("Expected native checkpoint binary, got %s", matchedNative.Name)
+	}
+}
