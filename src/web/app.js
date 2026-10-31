@@ -112,23 +112,17 @@ function setAppMode(mode) {
   const backupBtn = document.getElementById("btn-mode-backup");
   const restoreSec = document.getElementById("restore-content");
   const backupSec = document.getElementById("backup-content");
-  const bannerRestore = document.getElementById("banner-restore");
-  const bannerBackup = document.getElementById("banner-backup");
 
   if (mode === "restore") {
     restoreBtn?.classList.add("active");
     backupBtn?.classList.remove("active");
     restoreSec?.classList.remove("hidden");
     backupSec?.classList.add("hidden");
-    bannerRestore?.classList.remove("hidden");
-    bannerBackup?.classList.add("hidden");
   } else {
     backupBtn?.classList.add("active");
     restoreBtn?.classList.remove("active");
     backupSec?.classList.remove("hidden");
     restoreSec?.classList.add("hidden");
-    bannerBackup?.classList.remove("hidden");
-    bannerRestore?.classList.add("hidden");
   }
 }
 
@@ -142,19 +136,13 @@ async function loadSystemStatus() {
     const badge = document.getElementById("os-badge");
     if (badge) {
       if (currentPlatform === "linux") {
-        badge.textContent = "Linux Restorer";
+        badge.textContent = "Linux";
         badge.style.backgroundColor = "#2ea043";
-        setAppMode("restore");
         document.getElementById("target-launcher-container")?.classList.remove("hidden");
       } else {
-        badge.textContent = "Windows Edition";
+        badge.textContent = "Windows";
         badge.style.backgroundColor = "#1f6feb";
-        setAppMode("backup");
         document.getElementById("target-launcher-container")?.classList.add("hidden");
-        const bannerRestoreText = document.getElementById("banner-restore-text");
-        if (bannerRestoreText) {
-          bannerRestoreText.innerHTML = "Select your <code>game_saves_bundle.zip</code> to restore. Automatically restores saves directly to native <strong>%APPDATA%</strong>, <strong>%LOCALAPPDATA%</strong>, <strong>Documents</strong>, and <strong>Saved Games</strong> with Steam Cloud timestamp protection.";
-        }
       }
     }
 

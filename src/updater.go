@@ -16,14 +16,14 @@ import (
 )
 
 // AppVersion defines the current semantic release version of Checkpoint
-const AppVersion = "1.1.1"
+const AppVersion = "1.1.2"
 
 // Repository configuration for GitHub Releases API
 const (
 	githubRepoOwner   = "Cryptorial0"
 	githubRepoName    = "Checkpoint"
 	githubReleasesURL = "https://api.github.com/repos/Cryptorial0/Checkpoint/releases/latest"
-	httpUserAgent     = "Checkpoint-Migrator/1.1.1"
+	httpUserAgent     = "Checkpoint-Migrator/1.1.2"
 )
 
 // ReleaseAsset describes a downloadable artifact attached to a GitHub release

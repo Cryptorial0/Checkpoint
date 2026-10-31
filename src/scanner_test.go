@@ -1223,4 +1223,90 @@ func TestV0110EmulatorAndArtworkFeatures(t *testing.T) {
 	}
 }
 
+func TestV112PublisherAndSymlinkDeduplication(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "checkpoint_v112_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// 1. Test Unreal Project Codenames
+	palID, palName := resolveUnrealProjectCodename("Pal")
+	if palID != "1623730" || palName != "Palworld" {
+		t.Errorf("Expected Pal -> 1623730 / Palworld, got %s / %s", palID, palName)
+	}
+
+	rogueID, rogueName := resolveUnrealProjectCodename("RogueCore")
+	if rogueID != "2605790" || rogueName != "Deep Rock Galactic: Rogue Core" {
+		t.Errorf("Expected RogueCore -> 2605790 / Deep Rock Galactic: Rogue Core, got %s / %s", rogueID, rogueName)
+	}
+
+	// 2. Test Clean Game Title Demo Suffix Trimming
+	cleanedDemo := cleanGameTitle("OnimushaWotS_Demo")
+	if cleanedDemo != "Onimusha: Way of the Sword" {
+		t.Errorf("Expected clean title 'Onimusha: Way of the Sword', got '%s'", cleanedDemo)
+	}
+
+	// 3. Test Publisher Subdirectories in My Games
+	docsDir := filepath.Join(tmpDir, "Documents")
+	myGamesDir := filepath.Join(docsDir, "My Games")
+
+	// Case A: WB Games with child game folder (Shadow of Mordor)
+	mordorDir := filepath.Join(myGamesDir, "WB Games", "Shadow of Mordor")
+	if err := os.MkdirAll(mordorDir, 0755); err != nil {
+		t.Fatalf("Failed to create mock Mordor dir: %v", err)
+	}
+	os.WriteFile(filepath.Join(mordorDir, "settings.cfg"), []byte("wb_mordor_save_data"), 0644)
+
+	// Case B: Square Enix with loose telemetry file only (no subdirectories)
+	sqexDir := filepath.Join(myGamesDir, "Square Enix")
+	if err := os.MkdirAll(sqexDir, 0755); err != nil {
+		t.Fatalf("Failed to create mock Square Enix dir: %v", err)
+	}
+	os.WriteFile(filepath.Join(sqexDir, "crashreporter.log"), []byte("telemetry_log_data"), 0644)
+
+	var detectedGames []DetectedGame
+	seenMap := make(map[string]bool)
+	scanSpecificDocsDir(docsDir, &detectedGames, seenMap)
+
+	foundMordor := false
+	foundGenericWB := false
+	foundGenericSqEx := false
+
+	for _, g := range detectedGames {
+		if strings.Contains(strings.ToLower(g.Name), "mordor") || strings.Contains(strings.ToLower(g.TargetRelativePath), "shadow of mordor") {
+			foundMordor = true
+		}
+		if g.Name == "WB Games" {
+			foundGenericWB = true
+		}
+		if g.Name == "Square Enix" {
+			foundGenericSqEx = true
+		}
+	}
+
+	if !foundMordor {
+		t.Errorf("Expected child game 'Shadow of Mordor' inside WB Games to be detected")
+	}
+	if foundGenericWB {
+		t.Errorf("Expected publisher umbrella folder 'WB Games' NOT to be registered as a game")
+	}
+	if foundGenericSqEx {
+		t.Errorf("Expected empty/telemetry publisher folder 'Square Enix' NOT to be registered as a game")
+	}
+
+	// 4. Test Symlink Canonical Path Deduplication
+	realDir := filepath.Join(tmpDir, "real_save_folder")
+	os.MkdirAll(realDir, 0755)
+	symlinkDir := filepath.Join(tmpDir, "symlink_save_folder")
+	_ = os.Symlink(realDir, symlinkDir)
+
+	canonReal := getCanonicalPath(realDir)
+	canonSymlink := getCanonicalPath(symlinkDir)
+	if canonReal != canonSymlink {
+		t.Errorf("Expected getCanonicalPath to resolve symlink to real path: %s vs %s", canonReal, canonSymlink)
+	}
+}
+
+
 

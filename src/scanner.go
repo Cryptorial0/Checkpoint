@@ -83,6 +83,8 @@ var knownAppIDs = map[string]string{
 	"1888160": "Armored Core VI",
 	"1888930": "The Last of Us™ Part I",
 	"548430":  "Deep Rock Galactic",
+	"2605790": "Deep Rock Galactic: Rogue Core",
+	"1623730": "Palworld",
 	"1145360": "Hades",
 	"1145350": "Hades II",
 	"632360":  "Risk of Rain 2",
@@ -733,6 +735,10 @@ func extractUnrealConfigMeta(gameFolder string) (appID string, projectName strin
 func resolveUnrealProjectCodename(folderName string) (appID string, gameName string) {
 	norm := strings.ToLower(strings.ReplaceAll(folderName, " ", ""))
 	switch norm {
+	case "pal":
+		return "1623730", "Palworld"
+	case "roguecore":
+		return "2605790", "Deep Rock Galactic: Rogue Core"
 	case "highmoon":
 		return "1065310", "Evil West"
 	case "pagoda":
@@ -996,7 +1002,7 @@ func expandGamingAcronyms(title string) string {
 func cleanGameTitle(raw string) string {
 	clean := raw
 	clean = strings.NewReplacer("™", "", "®", "", "©", "").Replace(clean)
-	suffixes := []string{" Game", " Client", " Release", "_Data", "-Win64-Shipping", "Win64", " Steam", " Demo"}
+	suffixes := []string{" Game", " Client", " Release", "_Data", "-Win64-Shipping", "Win64", " Steam", " Demo", "_Demo", "-Demo", " demo", "_demo", "-demo"}
 	for _, s := range suffixes {
 		clean = strings.TrimSuffix(clean, s)
 	}
@@ -1008,6 +1014,65 @@ func cleanGameTitle(raw string) string {
 	}
 	clean = strings.TrimSpace(clean)
 	return expandGamingAcronyms(clean)
+}
+
+func findLocalSteamManifestName(appID string) string {
+	if appID == "" {
+		return ""
+	}
+	var candidates []string
+	if runtime.GOOS == "windows" {
+		candidates = append(candidates,
+			filepath.Join(`C:\Program Files (x86)\Steam\steamapps`, fmt.Sprintf("appmanifest_%s.acf", appID)),
+			filepath.Join(`C:\Program Files\Steam\steamapps`, fmt.Sprintf("appmanifest_%s.acf", appID)),
+			filepath.Join(`C:\Steam\steamapps`, fmt.Sprintf("appmanifest_%s.acf", appID)),
+		)
+		for _, d := range GetAvailableDrives() {
+			candidates = append(candidates,
+				filepath.Join(d.Path, "SteamLibrary", "steamapps", fmt.Sprintf("appmanifest_%s.acf", appID)),
+				filepath.Join(d.Path, "Steam", "steamapps", fmt.Sprintf("appmanifest_%s.acf", appID)),
+			)
+		}
+	} else {
+		home := os.Getenv("HOME")
+		if home != "" {
+			candidates = append(candidates,
+				filepath.Join(home, ".local", "share", "Steam", "steamapps", fmt.Sprintf("appmanifest_%s.acf", appID)),
+				filepath.Join(home, ".steam", "steam", "steamapps", fmt.Sprintf("appmanifest_%s.acf", appID)),
+			)
+		}
+		for _, m := range []string{"/mnt", "/media", "/run/media"} {
+			if matches, err := filepath.Glob(filepath.Join(m, "*", "SteamLibrary", "steamapps", fmt.Sprintf("appmanifest_%s.acf", appID))); err == nil {
+				candidates = append(candidates, matches...)
+			}
+			if matches, err := filepath.Glob(filepath.Join(m, "*", "*", "SteamLibrary", "steamapps", fmt.Sprintf("appmanifest_%s.acf", appID))); err == nil {
+				candidates = append(candidates, matches...)
+			}
+		}
+	}
+
+	for _, cand := range candidates {
+		f, err := os.Open(cand)
+		if err != nil {
+			continue
+		}
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if strings.HasPrefix(line, `"name"`) {
+				idx := strings.Index(line, `"name"`)
+				rest := strings.TrimSpace(line[idx+6:])
+				gName := strings.Trim(rest, ` "	`)
+				f.Close()
+				if gName != "" {
+					return gName
+				}
+				break
+			}
+		}
+		f.Close()
+	}
+	return ""
 }
 
 func getGameName(appid, defaultName string) string {
@@ -1026,7 +1091,16 @@ func getGameName(appid, defaultName string) string {
 		return name
 	}
 
-	// Fetch from Steam Store API
+	// 1. Try reading the game title from a local Steam library appmanifest
+	if localName := findLocalSteamManifestName(appid); localName != "" {
+		appNameCacheMu.Lock()
+		appNameCache[appid] = localName
+		appNameCacheMu.Unlock()
+		go saveCache()
+		return localName
+	}
+
+	// 2. Fetch from Steam Store API
 	onlineName := fetchSteamNameOnline(appid)
 	if onlineName != "" {
 		appNameCacheMu.Lock()
@@ -1465,6 +1539,15 @@ func getSteamPathFromRegistry() string {
 	return ""
 }
 
+// getCanonicalPath resolves symbolic links and cleans paths to ensure consistent map keys
+func getCanonicalPath(path string) string {
+	clean := filepath.Clean(path)
+	if resolved, err := filepath.EvalSymlinks(clean); err == nil {
+		clean = resolved
+	}
+	return strings.ToLower(clean)
+}
+
 func getSteamInstallRoots() []string {
 	var roots []string
 	if runtime.GOOS == "windows" {
@@ -1499,9 +1582,9 @@ func getSteamInstallRoots() []string {
 	var unique []string
 	for _, r := range roots {
 		clean := filepath.Clean(r)
-		k := strings.ToLower(clean)
-		if !seen[k] {
-			seen[k] = true
+		canon := getCanonicalPath(clean)
+		if !seen[canon] {
+			seen[canon] = true
 			unique = append(unique, clean)
 		}
 	}
@@ -1548,7 +1631,7 @@ func scanSteamUserdata(games *[]DetectedGame, seen map[string]bool) {
 				}
 
 				appPath := filepath.Join(userPath, appID)
-				canonical := strings.ToLower(filepath.Clean(appPath))
+				canonical := getCanonicalPath(appPath)
 				if seen[canonical] || seen[appPath] {
 					continue
 				}
@@ -1763,7 +1846,7 @@ func scanUserAppDataLocalLow(localLow string, games *[]DetectedGame, seen map[st
 			}
 
 			gamePath := filepath.Join(cPath, gName)
-			canonical := strings.ToLower(filepath.Clean(gamePath))
+			canonical := getCanonicalPath(gamePath)
 			if seen[canonical] || seen[gamePath] {
 				continue
 			}
@@ -1886,11 +1969,13 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 		// 1. Standard Unreal Engine SaveGames: <LocalAppData>\<GameName>\Saved\SaveGames
 		saveGamesDir := filepath.Join(gameFolder, "Saved", "SaveGames")
 		if stat, err := os.Stat(saveGamesDir); err == nil && stat.IsDir() {
-			if seen[saveGamesDir] {
+			canonical := getCanonicalPath(saveGamesDir)
+			if seen[canonical] || seen[saveGamesDir] {
 				continue
 			}
 			count, size := getDirStats(saveGamesDir)
 			if count > 0 {
+				seen[canonical] = true
 				seen[saveGamesDir] = true
 
 				// Check local ini for AppID / ProjectName
@@ -2902,6 +2987,30 @@ func scanUserDocumentsGames(games *[]DetectedGame, seen map[string]bool) {
 	}
 }
 
+var knownPublisherFolders = map[string]bool{
+	"wb games":             true,
+	"warner bros":          true,
+	"warner bros. games":   true,
+	"warner bros games":    true,
+	"square enix":          true,
+	"bioware":              true,
+	"capcom":               true,
+	"konami":               true,
+	"rockstar games":       true,
+	"telltale games":       true,
+	"bethesda softworks":   true,
+	"cd projekt red":       true,
+	"respawn":              true,
+	"arkane":               true,
+	"machinegames":         true,
+	"criterion games":      true,
+	"codemasters":          true,
+	"feral interactive":    true,
+	"electronic arts":      true,
+	"ea games":             true,
+	"ubisoft":              true,
+}
+
 func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]bool) {
 	if docsDir == "" {
 		return
@@ -2967,59 +3076,113 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 			mgEntries, err := os.ReadDir(subPath)
 			if err == nil {
 				for _, mg := range mgEntries {
-					if mg.IsDir() {
-						mgPath := filepath.Join(subPath, mg.Name())
-						canonical := strings.ToLower(filepath.Clean(mgPath))
-						if seen[canonical] || seen[mgPath] {
+					if !mg.IsDir() {
+						continue
+					}
+					mgName := mg.Name()
+					mgLow := strings.ToLower(mgName)
+					mgPath := filepath.Join(subPath, mgName)
+
+					// Check if child directory inside "My Games" is a publisher umbrella folder (e.g. WB Games, Square Enix)
+					if knownPublisherFolders[mgLow] {
+						pubSubEntries, err := os.ReadDir(mgPath)
+						if err == nil {
+							for _, pse := range pubSubEntries {
+								if !pse.IsDir() {
+									continue
+								}
+								pseName := pse.Name()
+								pseLow := strings.ToLower(pseName)
+								if ignoredGenericGameFolders[pseLow] || pseLow == "launcher" || pseLow == "crashreporter" || pseLow == "logs" || pseLow == "telemetry" {
+									continue
+								}
+								gameSubPath := filepath.Join(mgPath, pseName)
+								canonical := getCanonicalPath(gameSubPath)
+								if seen[canonical] || seen[gameSubPath] {
+									continue
+								}
+								count, size := getDirStats(gameSubPath)
+								if count > 0 {
+									seen[canonical] = true
+									seen[gameSubPath] = true
+									appID, iconURL, protonTier := resolveAppIDByName(pseName)
+									cleanName := cleanGameTitle(pseName)
+									if appID != "" {
+										cleanName = getGameName(appID, cleanName)
+									}
+									if isOnlineLiveServiceGame(cleanName, appID, gameSubPath) {
+										continue
+									}
+									*games = append(*games, DetectedGame{
+										ID:                 "doc_mygames_" + sanitizeID(mgName) + "_" + sanitizeID(pseName),
+										Name:               cleanName,
+										AppID:              appID,
+										SaveType:           SaveTypePrefix,
+										StorageType:        "Documents (My Games)",
+										SourcePath:         gameSubPath,
+										TargetRelativePath: "users/steamuser/Documents/My Games/" + mgName + "/" + pseName,
+										FileCount:          count,
+										SizeBytes:          size,
+										IconURL:            iconURL,
+										ProtonTier:         protonTier,
+									})
+								}
+							}
+						}
+						// Never register the publisher container directory itself as a game
+						continue
+					}
+
+					canonical := getCanonicalPath(mgPath)
+					if seen[canonical] || seen[mgPath] {
+						continue
+					}
+					count, size := getDirStats(mgPath)
+					if count > 0 {
+						seen[canonical] = true
+						seen[mgPath] = true
+						appID, iconURL, protonTier := resolveAppIDByName(mgName)
+						cleanName := mgName
+						if appID != "" {
+							cleanName = getGameName(appID, cleanName)
+						}
+
+						if isOnlineLiveServiceGame(cleanName, appID, mgPath) {
 							continue
 						}
-						count, size := getDirStats(mgPath)
-						if count > 0 {
-							seen[canonical] = true
-							seen[mgPath] = true
-							appID, iconURL, protonTier := resolveAppIDByName(mg.Name())
-							cleanName := mg.Name()
-							if appID != "" {
-								cleanName = getGameName(appID, cleanName)
-							}
 
-							if isOnlineLiveServiceGame(cleanName, appID, mgPath) {
-								continue
-							}
-
-							*games = append(*games, DetectedGame{
-								ID:                 "doc_mygames_" + sanitizeID(mg.Name()),
-								Name:               cleanName,
-								AppID:              appID,
-								SaveType:           SaveTypePrefix,
-								StorageType:          "Documents (My Games)",
-								SourcePath:         mgPath,
-								TargetRelativePath: "users/steamuser/Documents/My Games/" + mg.Name(),
-								FileCount:          count,
-								SizeBytes:          size,
-								IconURL:            iconURL,
-								ProtonTier:         protonTier,
-							})
-						}
+						*games = append(*games, DetectedGame{
+							ID:                 "doc_mygames_" + sanitizeID(mgName),
+							Name:               cleanName,
+							AppID:              appID,
+							SaveType:           SaveTypePrefix,
+							StorageType:        "Documents (My Games)",
+							SourcePath:         mgPath,
+							TargetRelativePath: "users/steamuser/Documents/My Games/" + mgName,
+							FileCount:          count,
+							SizeBytes:          size,
+							IconURL:            iconURL,
+							ProtonTier:         protonTier,
+						})
 					}
 				}
 			}
 			continue
 		}
 
-		// 2. Handle publisher subfolders (Rockstar Games, Telltale Games, KONAMI, CAPCOM, CD Projekt Red, Respawn)
-		if nameLow == "rockstar games" || nameLow == "telltale games" || nameLow == "konami" || nameLow == "capcom" || nameLow == "cd projekt red" || nameLow == "respawn" || nameLow == "arkane" || nameLow == "machinegames" || nameLow == "bethesda softworks" {
+		// 2. Handle publisher subfolders (Rockstar Games, WB Games, Telltale Games, KONAMI, CAPCOM, CD Projekt Red, Respawn)
+		if knownPublisherFolders[nameLow] {
 			pubEntries, err := os.ReadDir(subPath)
 			if err == nil {
 				for _, pe := range pubEntries {
 					if pe.IsDir() {
 						peName := pe.Name()
 						peLow := strings.ToLower(peName)
-						if ignoredGenericGameFolders[peLow] || peLow == "launcher" || peLow == "social club" {
+						if ignoredGenericGameFolders[peLow] || peLow == "launcher" || peLow == "social club" || peLow == "crashreporter" || peLow == "telemetry" {
 							continue
 						}
 						pePath := filepath.Join(subPath, peName)
-						canonical := strings.ToLower(filepath.Clean(pePath))
+						canonical := getCanonicalPath(pePath)
 						if seen[canonical] || seen[pePath] {
 							continue
 						}
@@ -3074,7 +3237,7 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 		}
 
 		// 4. Direct game folders in Documents (e.g. Darkest, Witcher 3, TLOU2, Tsushima)
-		canonical := strings.ToLower(filepath.Clean(subPath))
+		canonical := getCanonicalPath(subPath)
 		if seen[canonical] || seen[subPath] {
 			continue
 		}
@@ -3588,7 +3751,8 @@ func scanAppIDSubdirs(basePath, storageType, targetRelBase string, games *[]Dete
 			continue
 		}
 		fullPath := filepath.Join(basePath, appID)
-		if seen[fullPath] {
+		canonical := getCanonicalPath(fullPath)
+		if seen[canonical] || seen[fullPath] {
 			continue
 		}
 
@@ -3602,6 +3766,7 @@ func scanAppIDSubdirs(basePath, storageType, targetRelBase string, games *[]Dete
 			continue
 		}
 
+		seen[canonical] = true
 		seen[fullPath] = true
 		gameName = fmt.Sprintf("%s (%s)", gameName, storageType)
 
@@ -4663,18 +4828,20 @@ func scanWinePrefix(prefixRoot string, originAppID string, games *[]DetectedGame
 			g := &(*games)[i]
 			if strings.HasPrefix(filepath.ToSlash(g.SourcePath), filepath.ToSlash(prefixRoot)) {
 				if g.AppID == "" {
-					appIDToUse := originAppID
-					if _, err := strconv.Atoi(originAppID); err != nil {
-						if resolved, _, _ := resolveAppIDByName(originAppID); resolved != "" {
-							appIDToUse = resolved
+					var appIDToUse string
+					if _, err := strconv.Atoi(originAppID); err == nil {
+						appIDToUse = originAppID
+					} else if resolved, _, _ := resolveAppIDByName(originAppID); resolved != "" {
+						appIDToUse = resolved
+					}
+					if appIDToUse != "" {
+						g.AppID = appIDToUse
+						if g.IconURL == "" {
+							g.IconURL = getSteamIconURL(g.AppID)
 						}
-					}
-					g.AppID = appIDToUse
-					if g.IconURL == "" && g.AppID != "" {
-						g.IconURL = getSteamIconURL(g.AppID)
-					}
-					if g.ProtonTier == "" && g.AppID != "" {
-						g.ProtonTier = fetchProtonDBTier(g.AppID)
+						if g.ProtonTier == "" {
+							g.ProtonTier = fetchProtonDBTier(g.AppID)
+						}
 					}
 				}
 			}
