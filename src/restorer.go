@@ -535,10 +535,14 @@ func findSteamLibraryFolders() []string {
 		if clean == "" || clean == "." {
 			return
 		}
-		if !seen[clean] {
-			if stat, err := os.Stat(clean); err == nil && stat.IsDir() {
-				seen[clean] = true
-				libraries = append(libraries, clean)
+		canonical := clean
+		if target, err := filepath.EvalSymlinks(clean); err == nil && target != "" {
+			canonical = filepath.Clean(target)
+		}
+		if !seen[canonical] {
+			if stat, err := os.Stat(canonical); err == nil && stat.IsDir() {
+				seen[canonical] = true
+				libraries = append(libraries, canonical)
 			}
 		}
 	}
