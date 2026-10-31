@@ -512,11 +512,8 @@ func main() {
 		writeJSON(w, map[string]string{"status": "restarting"})
 		go func() {
 			time.Sleep(500 * time.Millisecond)
-			execPath, err := os.Executable()
-			if err == nil {
-				execPath, _ = filepath.EvalSymlinks(execPath)
-				cmd := exec.Command(execPath)
-				_ = cmd.Start()
+			if err := restartApplication(); err != nil {
+				Log("Failed to restart application: %v", err)
 			}
 			os.Exit(0)
 		}()

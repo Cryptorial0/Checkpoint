@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -445,5 +446,75 @@ func replaceExecutable(tempPath, targetPath string) error {
 	}
 	out.Close()
 	_ = os.Remove(backupPath)
+	return nil
+}
+
+// getRestartExecutable determines the appropriate binary or AppImage path to launch on application restart
+func getRestartExecutable() (string, bool, error) {
+	isAppImg, appImgPath := isRunningAsAppImage()
+	if isAppImg && appImgPath != "" {
+		cleanPath := filepath.Clean(appImgPath)
+		if st, err := os.Stat(cleanPath); err == nil && !st.IsDir() {
+			return cleanPath, true, nil
+		}
+	}
+
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", false, fmt.Errorf("unable to determine current executable path: %w", err)
+	}
+	execPath, _ = filepath.EvalSymlinks(execPath)
+	if runtime.GOOS == "windows" && strings.HasSuffix(strings.ToLower(execPath), ".old") {
+		execPath = strings.TrimSuffix(execPath, ".old")
+	}
+	return execPath, false, nil
+}
+
+// restartApplication launches the updated executable in a detached process and returns immediately
+func restartApplication() error {
+	execPath, isAppImg, err := getRestartExecutable()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(execPath, os.Args[1:]...)
+
+	if isAppImg {
+		appDir := os.Getenv("APPDIR")
+		var cleanEnv []string
+		for _, env := range os.Environ() {
+			if strings.HasPrefix(env, "APPDIR=") || strings.HasPrefix(env, "ARGV0=") {
+				continue
+			}
+			if strings.HasPrefix(env, "LD_LIBRARY_PATH=") && appDir != "" {
+				val := strings.TrimPrefix(env, "LD_LIBRARY_PATH=")
+				parts := strings.Split(val, ":")
+				var cleanParts []string
+				for _, p := range parts {
+					if !strings.HasPrefix(p, appDir) {
+						cleanParts = append(cleanParts, p)
+					}
+				}
+				if len(cleanParts) > 0 {
+					cleanEnv = append(cleanEnv, "LD_LIBRARY_PATH="+strings.Join(cleanParts, ":"))
+				}
+				continue
+			}
+			cleanEnv = append(cleanEnv, env)
+		}
+		cmd.Env = cleanEnv
+	}
+
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	setDetachedProcess(cmd)
+
+	Log("Relaunching Checkpoint (isAppImage=%v): %s", isAppImg, execPath)
+	if err := cmd.Start(); err != nil {
+		Log("Failed starting restarted process: %v", err)
+		return fmt.Errorf("failed starting process: %w", err)
+	}
+
 	return nil
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -76,5 +78,38 @@ func TestFindMatchingAssetAppImageSelection(t *testing.T) {
 	}
 	if matchedNative.Name != "checkpoint" {
 		t.Errorf("Expected native checkpoint binary, got %s", matchedNative.Name)
+	}
+}
+
+func TestGetRestartExecutable(t *testing.T) {
+	// Test AppImage mode with valid file
+	fakeAppImg := filepath.Join(t.TempDir(), "checkpoint.AppImage")
+	if err := os.WriteFile(fakeAppImg, []byte("fake appimage"), 0755); err != nil {
+		t.Fatalf("Failed to write fake AppImage: %v", err)
+	}
+
+	t.Setenv("APPIMAGE", fakeAppImg)
+	target, isAppImg, err := getRestartExecutable()
+	if err != nil {
+		t.Fatalf("getRestartExecutable returned unexpected error: %v", err)
+	}
+	if !isAppImg {
+		t.Errorf("Expected isAppImg to be true")
+	}
+	if target != fakeAppImg {
+		t.Errorf("Expected target %q, got %q", fakeAppImg, target)
+	}
+
+	// Test native binary fallback mode
+	t.Setenv("APPIMAGE", "")
+	nativeTarget, nativeIsAppImg, err := getRestartExecutable()
+	if err != nil {
+		t.Fatalf("getRestartExecutable native returned error: %v", err)
+	}
+	if nativeIsAppImg {
+		t.Errorf("Expected nativeIsAppImg to be false")
+	}
+	if nativeTarget == "" {
+		t.Errorf("Expected non-empty nativeTarget path")
 	}
 }
