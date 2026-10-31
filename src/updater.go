@@ -434,6 +434,7 @@ func replaceExecutable(tempPath, targetPath string) error {
 	return nil
 }
 
+// getRestartExecutable determines the appropriate binary or AppImage path to launch on application restart
 func getRestartExecutable() (string, bool, error) {
 	isAppImg, appImgPath := isRunningAsAppImage()
 	if isAppImg && appImgPath != "" {
@@ -454,6 +455,7 @@ func getRestartExecutable() (string, bool, error) {
 	return execPath, false, nil
 }
 
+// restartApplication launches the updated executable in a detached process and returns immediately
 func restartApplication() error {
 	execPath, isAppImg, err := getRestartExecutable()
 	if err != nil {
