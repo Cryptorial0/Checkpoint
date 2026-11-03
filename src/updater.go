@@ -16,10 +16,8 @@ import (
 	"time"
 )
 
-// AppVersion defines the current semantic release version of Checkpoint
 const AppVersion = "1.1.3"
 
-// Repository configuration for GitHub Releases API
 const (
 	githubRepoOwner   = "Cryptorial0"
 	githubRepoName    = "Checkpoint"
@@ -27,14 +25,12 @@ const (
 	httpUserAgent     = "Checkpoint-Migrator/1.1.3"
 )
 
-// ReleaseAsset describes a downloadable artifact attached to a GitHub release
 type ReleaseAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
 	Size               int64  `json:"size"`
 }
 
-// GitHubReleaseResponse maps the relevant fields returned by the GitHub Releases API
 type GitHubReleaseResponse struct {
 	TagName     string         `json:"tag_name"`
 	Name        string         `json:"name"`
@@ -45,7 +41,6 @@ type GitHubReleaseResponse struct {
 	Assets      []ReleaseAsset `json:"assets"`
 }
 
-// UpdateInfo contains the parsed update status presented to the user
 type UpdateInfo struct {
 	CurrentVersion  string `json:"current_version"`
 	LatestVersion   string `json:"latest_version"`
@@ -57,7 +52,6 @@ type UpdateInfo struct {
 	PublishedDate   string `json:"published_date"`
 }
 
-// updateCache stores the last check result to avoid exceeding GitHub API rate limits
 type updateCache struct {
 	sync.Mutex
 	lastChecked time.Time
@@ -66,8 +60,6 @@ type updateCache struct {
 
 var updateCheckerCache updateCache
 
-// isNewerVersion compares two semantic version strings (e.g. "1.1.0" vs "1.0.0").
-// Returns true only if the latest version is strictly newer than current.
 func isNewerVersion(latest, current string) bool {
 	latest = strings.TrimPrefix(strings.TrimSpace(latest), "v")
 	current = strings.TrimPrefix(strings.TrimSpace(current), "v")
@@ -86,7 +78,6 @@ func isNewerVersion(latest, current string) bool {
 	return len(latestParts) > len(currentParts)
 }
 
-// parseVersionSegments breaks down a version string into individual integer components
 func parseVersionSegments(v string) []int {
 	rawSegments := strings.Split(v, ".")
 	segments := make([]int, 0, len(rawSegments))
@@ -108,7 +99,6 @@ func parseVersionSegments(v string) []int {
 	return segments
 }
 
-// isRunningAsAppImage detects if the application is running packaged as an AppImage on Linux
 func isRunningAsAppImage() (bool, string) {
 	if runtime.GOOS != "linux" {
 		return false, ""
@@ -131,7 +121,6 @@ func isRunningAsAppImage() (bool, string) {
 	return false, ""
 }
 
-// findMatchingAsset selects the binary artifact matching the host operating system and architecture
 func findMatchingAsset(assets []ReleaseAsset) (ReleaseAsset, error) {
 	osName := runtime.GOOS
 	arch := runtime.GOARCH
@@ -179,7 +168,6 @@ func findMatchingAsset(assets []ReleaseAsset) (ReleaseAsset, error) {
 	return ReleaseAsset{}, fmt.Errorf("no compatible release asset found for %s/%s", osName, arch)
 }
 
-// CheckForUpdates queries the GitHub API for the latest release metadata
 func CheckForUpdates(force bool) (*UpdateInfo, error) {
 	updateCheckerCache.Lock()
 	defer updateCheckerCache.Unlock()
@@ -252,7 +240,6 @@ func CheckForUpdates(force bool) (*UpdateInfo, error) {
 	return info, nil
 }
 
-// CleanupOldBinary removes leftover backup binaries from previous updates (Windows .old files)
 func CleanupOldBinary() {
 	var execPath string
 	isAppImg, appImgPath := isRunningAsAppImage()
@@ -275,7 +262,6 @@ func CleanupOldBinary() {
 	}
 }
 
-// ApplyUpdate downloads the new release binary and replaces the running executable on disk
 func ApplyUpdate(downloadURL string, progressCallback func(percent float64, message string)) error {
 	if downloadURL == "" {
 		return errors.New("empty download URL")
@@ -392,7 +378,6 @@ func ApplyUpdate(downloadURL string, progressCallback func(percent float64, mess
 	return nil
 }
 
-// replaceExecutable swaps the current running binary on disk with the new binary payload
 func replaceExecutable(tempPath, targetPath string) error {
 	if runtime.GOOS == "windows" {
 		// Windows locks running binaries against write access, but permits renaming open files.
@@ -449,7 +434,6 @@ func replaceExecutable(tempPath, targetPath string) error {
 	return nil
 }
 
-// getRestartExecutable determines the appropriate binary or AppImage path to launch on application restart
 func getRestartExecutable() (string, bool, error) {
 	isAppImg, appImgPath := isRunningAsAppImage()
 	if isAppImg && appImgPath != "" {
@@ -470,7 +454,6 @@ func getRestartExecutable() (string, bool, error) {
 	return execPath, false, nil
 }
 
-// restartApplication launches the updated executable in a detached process and returns immediately
 func restartApplication() error {
 	execPath, isAppImg, err := getRestartExecutable()
 	if err != nil {

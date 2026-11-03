@@ -74,7 +74,7 @@ func EnableFastStartup() (string, error) {
 
 func checkWindowsBitLocker() (bool, string) {
 	// Use manage-bde with a strict 1-second timeout and hidden window.
-	// Zero PowerShell, zero console window flashing.
+	// Avoid PowerShell to prevent console window flashing.
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 

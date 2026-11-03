@@ -491,7 +491,7 @@ func isConfidentMatch(cleanTitle, itemTitle string) bool {
 	return false
 }
 
-// Universal title resolution via Steam Store Search API (Zero Hardcoding)
+// resolveAppIDByName queries the Steam Store search API to match a title to an AppID
 func resolveAppIDByName(rawTitle string) (appID, iconURL, protonTier string) {
 	cleanTitle := cleanGameTitle(rawTitle)
 	if len(cleanTitle) < 2 {
@@ -559,9 +559,8 @@ func resolveAppIDByName(rawTitle string) (appID, iconURL, protonTier string) {
 	return "", "", ""
 }
 
-// findAppIDByInstalledGameFolder dynamically scans Steam library installations on the machine
-// to match internal Unreal Engine project folders (e.g. Discovery in THE FINALS, PioneerGame in ARC Raiders)
-// with ZERO hardcoded game names.
+// findAppIDByInstalledGameFolder checks Steam library manifests to match internal project
+// folder names (such as Discovery in THE FINALS) to their parent game install directory
 func findAppIDByInstalledGameFolder(folderName string) (appID string, gameName string) {
 	if folderName == "" {
 		return "", ""
@@ -4661,10 +4660,7 @@ func sanitizeID(s string) string {
 	return strings.ToLower(s)
 }
 
-// ========================================================
-// NATIVE LINUX BACKUP SCANNER (Linux-to-Linux & Linux-to-Win)
-// ========================================================
-
+// Linux emulator and prefix scanner routines
 func scanPCSX2Memcards(memDir string, games *[]DetectedGame, seen map[string]bool) {
 	if stat, err := os.Stat(memDir); err == nil && stat.IsDir() && !seen[memDir] {
 		count, size := getDirStats(memDir)
