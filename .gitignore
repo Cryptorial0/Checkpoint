@@ -1,19 +1,29 @@
-# Compiled binaries & build outputs
+# Binaries and build output
 /bin/
+/dist/
 *.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 *.AppImage
-*.log
-save-migrator
 checkpoint
+save-migrator
 
-# OS & IDE
+# Test artifacts and coverage
+*.out
+*.test
+
+# Editor and OS metadata
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# Internal specifications & planning documents
-linux.md
-plan.md
+# Local logs and backups
+*.log
+*.checkpoint_bak_*
 
-Checkpoint/
+# Syncthing metadata
+.stversions/
+.stignore
