@@ -67,6 +67,7 @@ func main() {
 	nativeFlag := flag.Bool("native", false, "Force raw Win32 fallback GUI instead of modern standalone window")
 	restoreFlag := flag.String("restore", "", "Path to game_saves_bundle.zip or vault directory to restore")
 	autoFlag := flag.Bool("auto", false, "Automatically restore all resolvable games in CLI mode")
+	scanWindowsFlag := flag.String("scan-windows", "", "Path to mounted Windows volume or root (e.g. /mnt/windows)")
 	flag.Parse()
 
 	if *versionFlag || *versionLongFlag {
@@ -79,7 +80,7 @@ func main() {
 		if *restoreFlag != "" {
 			runCLIRestore(*restoreFlag, *autoFlag)
 		} else {
-			runCLI()
+			runCLI(*scanWindowsFlag)
 		}
 		return
 	}
@@ -812,7 +813,7 @@ func runCLIRestore(vaultPath string, auto bool) {
 	fmt.Printf("\nRestore complete: %d of %d games restored successfully.\n", successCount, resolvableCount)
 }
 
-func runCLI() {
+func runCLI(scanWindowsPath string) {
 	fmt.Println("=======================================================")
 	fmt.Println(" CHECKPOINT v0.9 [BETA]")
 	fmt.Println("=======================================================")
@@ -830,7 +831,11 @@ func runCLI() {
 
 	fmt.Println()
 	fmt.Println("Scanning game saves...")
-	games, err := ScanInstalledGames(nil)
+	var initialRoots []string
+	if scanWindowsPath != "" {
+		initialRoots = append(initialRoots, scanWindowsPath)
+	}
+	games, err := ScanInstalledGames(initialRoots)
 	if err != nil {
 		fmt.Printf("Scan error: %v\n", err)
 		return

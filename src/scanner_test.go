@@ -1308,5 +1308,59 @@ func TestV112PublisherAndSymlinkDeduplication(t *testing.T) {
 	}
 }
 
+func TestScanOfflineWindowsVolume(t *testing.T) {
+	tmpWinDir, err := os.MkdirTemp("", "checkpoint_winvol_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpWinDir)
+
+	// Create Windows structure
+	os.MkdirAll(filepath.Join(tmpWinDir, "Windows", "System32"), 0755)
+
+	// Create Elden Ring in AppData/Roaming
+	erDir := filepath.Join(tmpWinDir, "Users", "Gamer", "AppData", "Roaming", "EldenRing", "76561198000000000")
+	os.MkdirAll(erDir, 0755)
+	os.WriteFile(filepath.Join(erDir, "ER0000.sl2"), []byte("ELDEN_RING_SAVE"), 0644)
+
+	// Create Documents game
+	starfieldDir := filepath.Join(tmpWinDir, "Users", "Gamer", "Documents", "My Games", "Starfield", "Saves")
+	os.MkdirAll(starfieldDir, 0755)
+	os.WriteFile(filepath.Join(starfieldDir, "Save1.sfs"), []byte("STARFIELD_SAVE"), 0644)
+
+	if !isWindowsVolumeRoot(tmpWinDir) {
+		t.Fatalf("Expected isWindowsVolumeRoot to return true for %s", tmpWinDir)
+	}
+
+	var games []DetectedGame
+	seen := make(map[string]bool)
+	ScanWindowsVolume(tmpWinDir, &games, seen)
+
+	foundER := false
+	foundStarfield := false
+	for _, g := range games {
+		if strings.Contains(g.Name, "Elden Ring") {
+			foundER = true
+			if g.StorageType != "Offline Windows Partition" {
+				t.Errorf("Expected StorageType 'Offline Windows Partition', got %s", g.StorageType)
+			}
+		}
+		if strings.Contains(g.Name, "Starfield") {
+			foundStarfield = true
+			if g.StorageType != "Offline Windows Partition" {
+				t.Errorf("Expected StorageType 'Offline Windows Partition', got %s", g.StorageType)
+			}
+		}
+	}
+
+	if !foundER {
+		t.Errorf("Expected Elden Ring to be discovered from offline Windows volume")
+	}
+	if !foundStarfield {
+		t.Errorf("Expected Starfield to be discovered from offline Windows volume")
+	}
+}
+
+
 
 

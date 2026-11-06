@@ -1214,7 +1214,11 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 
 	SetProgress("scan", 80, "Scanning custom directories...", 80, 100, "")
 	for _, custom := range customScanRoots {
-		scanCustomPath(custom, &games, seenPaths)
+		if isWindowsVolumeRoot(custom) {
+			ScanWindowsVolume(custom, &games, seenPaths)
+		} else {
+			scanCustomPath(custom, &games, seenPaths)
+		}
 	}
 
 	// Dynamic machine correlation pass: only resolve engine project/studio folders (Unreal Engine & Unity)
@@ -4971,4 +4975,239 @@ func scanLinuxHostSaves(games *[]DetectedGame, seen map[string]bool) {
 
 	// 5. Console Emulators
 	scanLinuxConsoleEmulators(games, seen)
+
+	// 6. Offline Windows Partitions & NTFS Volumes
+	scanOfflineWindowsPartitions(games, seen)
+}
+
+func scanOfflineWindowsPartitions(games *[]DetectedGame, seen map[string]bool) {
+	// 1. Scan mounted partitions from /proc/mounts
+	mountsFile := "/proc/mounts"
+	data, err := os.ReadFile(mountsFile)
+	if err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			if len(fields) >= 3 {
+				mountPoint := fields[1]
+				fsType := fields[2]
+
+				isCandidateFs := fsType == "ntfs" || fsType == "ntfs3" || fsType == "fuseblk" || fsType == "vfat" || fsType == "exfat"
+				isCandidatePath := strings.HasPrefix(mountPoint, "/mnt/") || strings.HasPrefix(mountPoint, "/media/") || strings.HasPrefix(mountPoint, "/run/media/")
+
+				if isCandidateFs || isCandidatePath {
+					if isWindowsVolumeRoot(mountPoint) {
+						ScanWindowsVolume(mountPoint, games, seen)
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Also check common static mount paths
+	staticCandidates := []string{
+		"/mnt/windows",
+		"/mnt/c",
+		"/mnt/d",
+		"/media/windows",
+	}
+	for _, cand := range staticCandidates {
+		if isWindowsVolumeRoot(cand) {
+			ScanWindowsVolume(cand, games, seen)
+		}
+	}
+}
+
+func isWindowsVolumeRoot(root string) bool {
+	stat, err := os.Stat(root)
+	if err != nil || !stat.IsDir() {
+		return false
+	}
+
+	hasUsers := false
+	hasWindowsOrProg := false
+
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return false
+	}
+
+	for _, e := range entries {
+		low := strings.ToLower(e.Name())
+		if low == "users" && e.IsDir() {
+			hasUsers = true
+		}
+		if (low == "windows" || low == "programdata" || low == "program files") && e.IsDir() {
+			hasWindowsOrProg = true
+		}
+	}
+
+	return hasUsers && hasWindowsOrProg
+}
+
+func findDeviceForMount(mountPoint string) string {
+	data, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		return ""
+	}
+	cleanMount := filepath.Clean(mountPoint)
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && filepath.Clean(fields[1]) == cleanMount {
+			return fields[0]
+		}
+	}
+	return ""
+}
+
+func tryFixNTFSPartition(mountPath string) {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	testFile := filepath.Join(mountPath, ".checkpoint_test_write")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		Log("Windows volume at %s appears read-only: %v. Attempting ntfsfix...", mountPath, err)
+		dev := findDeviceForMount(mountPath)
+		if dev != "" && strings.HasPrefix(dev, "/dev/") {
+			cmd := exec.Command("ntfsfix", "-b", "-d", dev)
+			if out, err := cmd.CombinedOutput(); err == nil {
+				Log("ntfsfix succeeded on %s: %s", dev, string(out))
+			} else {
+				Log("ntfsfix failed on %s: %v (output: %s)", dev, err, string(out))
+			}
+		}
+	} else {
+		_ = os.Remove(testFile)
+	}
+}
+
+func ScanWindowsVolume(mountPath string, games *[]DetectedGame, seen map[string]bool) {
+	mountPath = getCanonicalPath(mountPath)
+	if seen["winvol_"+mountPath] {
+		return
+	}
+	seen["winvol_"+mountPath] = true
+
+	Log("Scanning offline Windows volume at: %s", mountPath)
+	tryFixNTFSPartition(mountPath)
+
+	usersDir := filepath.Join(mountPath, "Users")
+	if stat, err := os.Stat(usersDir); err != nil || !stat.IsDir() {
+		usersDir = filepath.Join(mountPath, "users")
+		if stat, err := os.Stat(usersDir); err != nil || !stat.IsDir() {
+			return
+		}
+	}
+
+	uEntries, err := os.ReadDir(usersDir)
+	if err != nil {
+		return
+	}
+
+	for _, ue := range uEntries {
+		if !ue.IsDir() {
+			continue
+		}
+		uName := ue.Name()
+		uLow := strings.ToLower(uName)
+
+		if uLow == "all users" || uLow == "default" || uLow == "default user" {
+			continue
+		}
+
+		if uLow == "public" {
+			pubDocs := filepath.Join(usersDir, uName, "Documents")
+			if stat, err := os.Stat(pubDocs); err == nil && stat.IsDir() {
+				runeBase := filepath.Join(pubDocs, "Steam", "RUNE")
+				scanAppIDSubdirs(runeBase, "Offline Profile", "users/Public/Documents/Steam/RUNE", games, seen)
+				codexBase := filepath.Join(pubDocs, "Steam", "CODEX")
+				scanAppIDSubdirs(codexBase, "Offline Profile", "users/Public/Documents/Steam/CODEX", games, seen)
+				empressBase := filepath.Join(pubDocs, "EMPRESS")
+				scanAppIDSubdirs(empressBase, "Offline Profile", "users/Public/Documents/EMPRESS", games, seen)
+			}
+			continue
+		}
+
+		uPath := filepath.Join(usersDir, uName)
+
+		// 1. AppData Local
+		localApp := filepath.Join(uPath, "AppData", "Local")
+		if stat, err := os.Stat(localApp); err == nil && stat.IsDir() {
+			scanLocalAppDataUnrealGames(localApp, games, seen)
+			skidrowBase := filepath.Join(localApp, "SKIDROW")
+			scanAppIDSubdirs(skidrowBase, "Offline Profile", "users/steamuser/AppData/Local/SKIDROW", games, seen)
+		}
+
+		// 2. AppData Roaming
+		roamingApp := filepath.Join(uPath, "AppData", "Roaming")
+		if stat, err := os.Stat(roamingApp); err == nil && stat.IsDir() {
+			goldbergBase := filepath.Join(roamingApp, "Goldberg SteamEmu Saves")
+			scanAppIDSubdirs(goldbergBase, "Offline Profile", "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves", games, seen)
+			fltBase := filepath.Join(roamingApp, "FLT")
+			scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
+
+			fromSoftGames := []struct {
+				dirName  string
+				gameName string
+				appID    string
+			}{
+				{"EldenRing", "Elden Ring (Character Saves)", "1245620"},
+				{"DarkSoulsIII", "Dark Souls III", "374320"},
+				{"Sekiro", "Sekiro: Shadows Die Twice", "814380"},
+				{"ArmoredCore6", "Armored Core VI", "1888160"},
+			}
+			for _, fg := range fromSoftGames {
+				saveDir := filepath.Join(roamingApp, fg.dirName)
+				if stat, err := os.Stat(saveDir); err == nil && stat.IsDir() && !seen[saveDir] {
+					count, size := getDirStats(saveDir)
+					if count > 0 {
+						seen[saveDir] = true
+						*games = append(*games, DetectedGame{
+							ID:                 "fromsoft_" + strings.ToLower(fg.dirName),
+							Name:               fg.gameName,
+							AppID:              fg.appID,
+							SaveType:           SaveTypePrefix,
+							StorageType:        "Offline Windows Partition",
+							SourcePath:         saveDir,
+							TargetRelativePath: "users/steamuser/AppData/Roaming/" + fg.dirName,
+							FileCount:          count,
+							SizeBytes:          size,
+							IconURL:            getSteamIconURL(fg.appID),
+							ProtonTier:         fetchProtonDBTier(fg.appID),
+						})
+					}
+				}
+			}
+		}
+
+		// 3. AppData LocalLow
+		localLow := filepath.Join(uPath, "AppData", "LocalLow")
+		if stat, err := os.Stat(localLow); err == nil && stat.IsDir() {
+			scanUserAppDataLocalLow(localLow, games, seen)
+		}
+
+		// 4. Documents & Saved Games
+		docs := filepath.Join(uPath, "Documents")
+		if stat, err := os.Stat(docs); err == nil && stat.IsDir() {
+			scanSpecificDocsDir(docs, games, seen)
+		}
+		savedGames := filepath.Join(uPath, "Saved Games")
+		if stat, err := os.Stat(savedGames); err == nil && stat.IsDir() {
+			scanSpecificDocsDir(savedGames, games, seen)
+		}
+	}
+
+	// 5. ProgramData
+	progData := filepath.Join(mountPath, "ProgramData")
+	if stat, err := os.Stat(progData); err == nil && stat.IsDir() {
+		scanAppIDSubdirs(filepath.Join(progData, "Steam"), "Offline Profile", "ProgramData/Steam", games, seen)
+	}
+
+	// Tag any game discovered inside this volume
+	for i := range *games {
+		g := &(*games)[i]
+		if strings.HasPrefix(filepath.ToSlash(g.SourcePath), filepath.ToSlash(mountPath)) {
+			g.StorageType = "Offline Windows Partition"
+		}
+	}
 }
