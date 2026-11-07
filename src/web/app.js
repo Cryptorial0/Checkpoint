@@ -231,26 +231,46 @@ async function loadSystemStatus() {
 }
 
 async function disableFastStartup() {
-  log("Attempting to disable fast startup...");
+  log("Attempting to disable fast startup (UAC prompt may appear)...");
+  const applyBtn = document.getElementById("btn-apply-fastboot");
+  if (applyBtn) {
+    applyBtn.disabled = true;
+    applyBtn.textContent = "Applying...";
+  }
   try {
     const res = await fetch("/api/disable-fast-startup", { method: "POST" });
     const text = await res.text();
     log(text);
-    loadSystemStatus();
+    await loadSystemStatus();
   } catch (err) {
     log("Error: " + err);
+  } finally {
+    if (applyBtn) {
+      applyBtn.disabled = false;
+      applyBtn.textContent = "Apply Tweak";
+    }
   }
 }
 
 async function enableFastStartup() {
-  log("Attempting to re-enable fast startup...");
+  log("Attempting to re-enable fast startup (UAC prompt may appear)...");
+  const reBtn = document.getElementById("btn-re-enable-fastboot");
+  if (reBtn) {
+    reBtn.disabled = true;
+    reBtn.textContent = "Re-enabling...";
+  }
   try {
     const res = await fetch("/api/enable-fast-startup", { method: "POST" });
     const text = await res.text();
     log(text);
-    loadSystemStatus();
+    await loadSystemStatus();
   } catch (err) {
     log("Error: " + err);
+  } finally {
+    if (reBtn) {
+      reBtn.disabled = false;
+      reBtn.textContent = "Re-enable / Undo";
+    }
   }
 }
 
@@ -2359,6 +2379,7 @@ window.addEventListener("focus", () => {
 });
 
 // Initial boot
+setAppMode("backup");
 loadSystemStatus();
 loadAppConfig();
 autoDetectUsbDrives();

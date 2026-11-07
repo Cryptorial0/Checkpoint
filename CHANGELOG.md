@@ -2,6 +2,15 @@
 
 All notable changes to Checkpoint are documented in this file.
 
+## [1.1.4] - 2026-11-07
+
+### Fixed
+- Fixed portable Xenia scanner false-positive regression that mistook arbitrary content directories (such as The Witcher 3 and Roblox asset trees) for Xbox 360 save data.
+- Added strict 16-character hexadecimal profile ID and 8-character hexadecimal title ID validation for Xbox 360 save detection.
+- Required emulator executable presence before falling back to whole-folder portable Xenia save packaging.
+- Fixed Windows Fast Startup toggle permissions failure by requesting UAC elevation when modifying system power configuration and registry.
+- Fixed initial view loading so the Backup Saves section renders immediately on startup without requiring switching to Restore and back.
+
 ## [1.1.3] - 2026-10-31
 
 ### Fixed

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -1360,6 +1361,75 @@ func TestScanOfflineWindowsVolume(t *testing.T) {
 		t.Errorf("Expected Starfield to be discovered from offline Windows volume")
 	}
 }
+
+func TestXeniaFalsePositiveRejectionAndDetection(t *testing.T) {
+	tmpGamesDir, err := os.MkdirTemp("", "checkpoint_xenia_test_*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpGamesDir)
+
+	// 1. Simulate Witcher 3 content folder structure (should be completely ignored)
+	witcherBundles := filepath.Join(tmpGamesDir, "The Witcher 3 - Wild Hunt", "content", "content0", "bundles")
+	os.MkdirAll(witcherBundles, 0755)
+	os.WriteFile(filepath.Join(witcherBundles, "blob0.bundle"), []byte("DUMMY_GAME_ASSET"), 0644)
+
+	// 2. Simulate Roblox content folder structure (should be completely ignored)
+	robloxLua := filepath.Join(tmpGamesDir, "Roblox", "content", "ExtraContent", "LuaPackages")
+	os.MkdirAll(robloxLua, 0755)
+	os.WriteFile(filepath.Join(robloxLua, "package.lua"), []byte("DUMMY_ROBLOX_SCRIPT"), 0644)
+
+	// 3. Simulate real portable Xenia installation with 16-hex profile and 8-hex title ID
+	xeniaDir := filepath.Join(tmpGamesDir, "XeniaPortable")
+	xeniaSave := filepath.Join(xeniaDir, "content", "0000000000000000", "5841088f", "00000001")
+	os.MkdirAll(xeniaSave, 0755)
+	os.WriteFile(filepath.Join(xeniaSave, "save.bin"), []byte("XBOX_360_SAVE_DATA"), 0644)
+	os.WriteFile(filepath.Join(xeniaDir, "xenia.exe"), []byte("EXE"), 0755)
+
+	var games []DetectedGame
+	seen := make(map[string]bool)
+	scanInTreeDirectory(tmpGamesDir, &games, seen)
+
+	for _, g := range games {
+		if strings.Contains(g.Name, "BUNDLES") || strings.Contains(g.Name, "LUAPACKAGES") {
+			t.Fatalf("Regression detected! False-positive Xenia save found: %s (%s)", g.Name, g.SourcePath)
+		}
+		if strings.Contains(g.SourcePath, "The Witcher 3") && strings.Contains(g.StorageType, "Xbox") {
+			t.Fatalf("Witcher 3 asset directory misclassified as Xbox save: %s", g.SourcePath)
+		}
+		if strings.Contains(g.SourcePath, "Roblox") && strings.Contains(g.StorageType, "Xbox") {
+			t.Fatalf("Roblox asset directory misclassified as Xbox save: %s", g.SourcePath)
+		}
+	}
+
+	foundRealXenia := false
+	for _, g := range games {
+		if strings.Contains(g.Name, "Xenia") && strings.Contains(g.SourcePath, "5841088f") {
+			foundRealXenia = true
+			if g.StorageType != "Xbox 360 Emulator (Xenia)" {
+				t.Errorf("Expected StorageType 'Xbox 360 Emulator (Xenia)', got %s", g.StorageType)
+			}
+		}
+	}
+
+	if !foundRealXenia {
+		t.Errorf("Expected valid portable Xenia installation to be discovered")
+	}
+}
+
+func TestFastStartupHandlers(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		msg, err := DisableFastStartup()
+		if err != nil || !strings.Contains(msg, "only applicable on Windows") {
+			t.Errorf("Expected non-Windows platform notice, got: %s (err: %v)", msg, err)
+		}
+		msg, err = EnableFastStartup()
+		if err != nil || !strings.Contains(msg, "only applicable on Windows") {
+			t.Errorf("Expected non-Windows platform notice, got: %s (err: %v)", msg, err)
+		}
+	}
+}
+
 
 
 

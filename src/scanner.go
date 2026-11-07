@@ -2665,6 +2665,49 @@ func getXboxTitleName(titleID string) string {
 	return xboxTitleMap[strings.ToLower(titleID)]
 }
 
+func isXboxTitleID(name string) bool {
+	if len(name) != 8 {
+		return false
+	}
+	for _, r := range strings.ToLower(name) {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+func isXboxProfileID(name string) bool {
+	if len(name) != 16 {
+		return false
+	}
+	for _, r := range strings.ToLower(name) {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+func isXeniaEmulatorDir(dir string) bool {
+	signatures := []string{
+		"xenia.exe",
+		"xenia_canary.exe",
+		"xenia-canary.exe",
+		"xenia",
+		"xenia_canary",
+		"xenia-canary",
+		"xenia.config.toml",
+		"xenia-canary.config.toml",
+	}
+	for _, sig := range signatures {
+		if stat, err := os.Stat(filepath.Join(dir, sig)); err == nil && !stat.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
 func isSwitchTitleID(name string) bool {
 	if len(name) != 16 {
 		return false
@@ -3920,11 +3963,12 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 		// Portable Xenia (Xbox 360)
 		contentDir := filepath.Join(gameFolder, "content")
 		if stat, err := os.Stat(contentDir); err == nil && stat.IsDir() {
+			isXeniaDir := isXeniaEmulatorDir(gameFolder)
 			profEntries, err := os.ReadDir(contentDir)
 			if err == nil {
 				foundTitles := false
 				for _, p := range profEntries {
-					if !p.IsDir() {
+					if !p.IsDir() || !isXboxProfileID(p.Name()) {
 						continue
 					}
 					profPath := filepath.Join(contentDir, p.Name())
@@ -3933,7 +3977,7 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 						continue
 					}
 					for _, t := range titleEntries {
-						if !t.IsDir() {
+						if !t.IsDir() || !isXboxTitleID(t.Name()) {
 							continue
 						}
 						titleDir := filepath.Join(profPath, t.Name())
@@ -3966,7 +4010,7 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 						}
 					}
 				}
-				if !foundTitles && !seen[contentDir] {
+				if !foundTitles && isXeniaDir && !seen[contentDir] {
 					count, size := getDirStats(contentDir)
 					if count > 0 {
 						seen[contentDir] = true
