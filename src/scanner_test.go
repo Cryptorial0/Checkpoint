@@ -1535,6 +1535,70 @@ func TestFindCandidateVaultsDetection(t *testing.T) {
 	}
 }
 
+func TestScan1911AndLiesOfP(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test_1911_liesofp_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// 1. Test .1911 profile scanner
+	base1911 := filepath.Join(tmpDir, ".1911")
+	rdr2Prof := filepath.Join(base1911, "Red Dead Redemption 2", "profile")
+	if err := os.MkdirAll(rdr2Prof, 0755); err != nil {
+		t.Fatalf("Failed to create 1911 rdr2 dir: %v", err)
+	}
+	_ = os.WriteFile(filepath.Join(rdr2Prof, "SRDR30000"), []byte("RDR2_SAVE_BINARY_DATA_TEST_12345"), 0644)
+	_ = os.WriteFile(filepath.Join(rdr2Prof, "Player"), []byte("PLAYER_DATA"), 0644)
+
+	var games []DetectedGame
+	seen := make(map[string]bool)
+	scan1911Subdirs(base1911, &games, seen)
+
+	if len(games) != 1 {
+		t.Fatalf("Expected 1 game from scan1911Subdirs, got %d", len(games))
+	}
+	g := games[0]
+	if g.AppID != "1174180" {
+		t.Errorf("Expected AppID 1174180, got %s", g.AppID)
+	}
+	if g.StorageType != "Offline Profile" {
+		t.Errorf("Expected StorageType 'Offline Profile', got %s", g.StorageType)
+	}
+	if !strings.Contains(g.Name, "Red Dead Redemption 2") {
+		t.Errorf("Expected name to contain 'Red Dead Redemption 2', got %s", g.Name)
+	}
+	if g.FileCount != 2 {
+		t.Errorf("Expected 2 files, got %d", g.FileCount)
+	}
+
+	// 2. Test Lies of P in-tree detection
+	gamesRoot := filepath.Join(tmpDir, "Games")
+	liesOfPDir := filepath.Join(gamesRoot, "Lies of P", "LiesofP", "Saved", "SaveGames")
+	if err := os.MkdirAll(liesOfPDir, 0755); err != nil {
+		t.Fatalf("Failed to create lies of p dir: %v", err)
+	}
+	_ = os.WriteFile(filepath.Join(liesOfPDir, "SaveData.sav"), []byte("LIES_OF_P_SAVE_DATA"), 0644)
+
+	var inTreeGames []DetectedGame
+	inTreeSeen := make(map[string]bool)
+	scanInTreeDirectory(gamesRoot, &inTreeGames, inTreeSeen)
+
+	var foundLiesOfP bool
+	for _, itg := range inTreeGames {
+		if itg.AppID == "1627720" || strings.Contains(strings.ToLower(itg.Name), "lies of p") {
+			foundLiesOfP = true
+			if itg.AppID != "1627720" {
+				t.Errorf("Expected AppID 1627720 for Lies of P, got %s", itg.AppID)
+			}
+			break
+		}
+	}
+	if !foundLiesOfP {
+		t.Errorf("Expected scanInTreeGameSaves to detect Lies of P in-tree, got: %+v", inTreeGames)
+	}
+}
+
 
 
 

@@ -551,6 +551,8 @@ func resolveAppIDByName(rawTitle string) (appID, iconURL, protonTier string) {
 		"the walking dead definitive series": "1449690",
 		"the last of us part ii":             "2531310",
 		"the last of us part 2":              "2531310",
+		"lies of p":                          "1627720",
+		"liesofp":                            "1627720",
 	}
 	if did, ok := delistedGames[strings.ToLower(cleanTitle)]; ok {
 		return did, getSteamIconURL(did), fetchProtonDBTier(did)
@@ -1697,9 +1699,19 @@ func scanUserAppData(games *[]DetectedGame, seen map[string]bool) {
 		goldbergSCBase := filepath.Join(appData, "Goldberg SocialClub Emu Saves")
 		scanGoldbergSocialClubSubdirs(goldbergSCBase, games, seen)
 
-		// FLT
+		// FLT & Fairlight
 		fltBase := filepath.Join(appData, "FLT")
 		scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
+		fairlightBase := filepath.Join(appData, "Fairlight")
+		scanAppIDSubdirs(fairlightBase, "Offline Profile", "users/steamuser/AppData/Roaming/Fairlight", games, seen)
+
+		// EMPRESS
+		empressRoaming := filepath.Join(appData, "EMPRESS")
+		scanAppIDSubdirs(empressRoaming, "Offline Profile", "users/steamuser/AppData/Roaming/EMPRESS", games, seen)
+
+		// .1911 Standalone Profiles
+		base1911 := filepath.Join(appData, ".1911")
+		scan1911Subdirs(base1911, games, seen)
 	}
 
 	// SKIDROW
@@ -3897,6 +3909,82 @@ func scanGoldbergSocialClubSubdirs(basePath string, games *[]DetectedGame, seen 
 	}
 }
 
+func scan1911Subdirs(basePath string, games *[]DetectedGame, seen map[string]bool) {
+	entries, err := os.ReadDir(basePath)
+	if err != nil {
+		return
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dirName := entry.Name()
+		dirLow := strings.ToLower(dirName)
+
+		var appID, gameName string
+		if dirLow == "rdr2" || strings.Contains(dirLow, "red dead") {
+			appID = "1174180"
+			gameName = "Red Dead Redemption 2"
+		} else if dirLow == "gta v" || dirLow == "gtav" || strings.Contains(dirLow, "grand theft auto v") {
+			appID = "271590"
+			gameName = "Grand Theft Auto V"
+		} else {
+			resID, _, _ := resolveAppIDByName(dirName)
+			if resID != "" {
+				appID = resID
+				gameName = getGameName(appID, dirName)
+			} else {
+				gameName = cleanGameTitle(dirName)
+			}
+		}
+
+		fullPath := filepath.Join(basePath, dirName)
+		profileSub := filepath.Join(fullPath, "profile")
+		savePath := fullPath
+		if stat, err := os.Stat(profileSub); err == nil && stat.IsDir() {
+			savePath = profileSub
+		}
+
+		canonical := getCanonicalPath(savePath)
+		if seen[canonical] || seen[savePath] {
+			continue
+		}
+
+		fileCount, size := getDirStats(savePath)
+		if fileCount == 0 || size <= 16 {
+			continue
+		}
+
+		seen[canonical] = true
+		seen[savePath] = true
+
+		targetRel := filepath.ToSlash(filepath.Join("users/steamuser/AppData/Roaming/.1911", dirName))
+		if savePath == profileSub {
+			targetRel = filepath.ToSlash(filepath.Join("users/steamuser/AppData/Roaming/.1911", dirName, "profile"))
+		}
+		var iconURL, protonTier string
+		if appID != "" {
+			iconURL = getSteamIconURL(appID)
+			protonTier = fetchProtonDBTier(appID)
+		}
+
+		*games = append(*games, DetectedGame{
+			ID:                 fmt.Sprintf("offline_1911_%s", sanitizeID(dirName)),
+			Name:               fmt.Sprintf("%s (Offline Profile)", gameName),
+			AppID:              appID,
+			SaveType:           SaveTypeInTree,
+			StorageType:        "Offline Profile",
+			SourcePath:         savePath,
+			TargetRelativePath: targetRel,
+			FileCount:          fileCount,
+			SizeBytes:          size,
+			IconURL:            iconURL,
+			ProtonTier:         protonTier,
+		})
+	}
+}
+
 var ignoredSystemDirs = map[string]bool{
 	"system volume information": true,
 	"$recycle.bin":              true,
@@ -4150,6 +4238,8 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 							appName = "Deep Rock Galactic: Rogue Core"
 						} else if strings.EqualFold(appName, "fsd") || strings.Contains(strings.ToLower(gameFolder), "deep rock") {
 							appName = "Deep Rock Galactic"
+						} else if strings.EqualFold(appName, "liesofp") || strings.EqualFold(gameParent, "liesofp") || strings.Contains(strings.ToLower(gameFolder), "lies of p") {
+							appName = "Lies of P"
 						}
 
 						appID := extractAppIDFromFolder(gameFolder)
@@ -4890,6 +4980,12 @@ func scanWinePrefix(prefixRoot string, originAppID string, games *[]DetectedGame
 			scanGoldbergSocialClubSubdirs(goldbergSCBase, games, seen)
 			fltBase := filepath.Join(roamingApp, "FLT")
 			scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
+			fairlightBase := filepath.Join(roamingApp, "Fairlight")
+			scanAppIDSubdirs(fairlightBase, "Offline Profile", "users/steamuser/AppData/Roaming/Fairlight", games, seen)
+			empressRoaming := filepath.Join(roamingApp, "EMPRESS")
+			scanAppIDSubdirs(empressRoaming, "Offline Profile", "users/steamuser/AppData/Roaming/EMPRESS", games, seen)
+			base1911 := filepath.Join(roamingApp, ".1911")
+			scan1911Subdirs(base1911, games, seen)
 
 			fromSoftGames := []struct {
 				dirName  string
@@ -5254,6 +5350,12 @@ func ScanWindowsVolume(mountPath string, games *[]DetectedGame, seen map[string]
 			scanGoldbergSocialClubSubdirs(goldbergSCBase, games, seen)
 			fltBase := filepath.Join(roamingApp, "FLT")
 			scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
+			fairlightBase := filepath.Join(roamingApp, "Fairlight")
+			scanAppIDSubdirs(fairlightBase, "Offline Profile", "users/steamuser/AppData/Roaming/Fairlight", games, seen)
+			empressRoaming := filepath.Join(roamingApp, "EMPRESS")
+			scanAppIDSubdirs(empressRoaming, "Offline Profile", "users/steamuser/AppData/Roaming/EMPRESS", games, seen)
+			base1911 := filepath.Join(roamingApp, ".1911")
+			scan1911Subdirs(base1911, games, seen)
 
 			fromSoftGames := []struct {
 				dirName  string

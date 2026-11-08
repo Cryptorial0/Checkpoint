@@ -8,7 +8,7 @@ import (
 )
 
 // HandleRockstarGamesAlignment synchronizes save files across all profile IDs,
-// emulator storage paths (Goldberg SocialClub Emu, .1911/EMPRESS), and Wine user directories.
+// standalone storage paths (Goldberg SocialClub, .1911 profile), and Wine user directories.
 func HandleRockstarGamesAlignment(targetDir, appID string) {
 	isRDR2 := appID == "1174180" || strings.Contains(strings.ToLower(targetDir), "red dead redemption 2")
 	isGTAV := appID == "271590" || appID == "3240220" || strings.Contains(strings.ToLower(targetDir), "gtav") || strings.Contains(strings.ToLower(targetDir), "gta v")
@@ -94,7 +94,7 @@ func HandleRockstarGamesAlignment(targetDir, appID string) {
 			goldbergRDR2 := filepath.Join(uDir, "AppData", "Roaming", "Goldberg SocialClub Emu Saves", "RDR2")
 			syncToProfilesFolder(goldbergRDR2, saveFiles, profileIDs)
 
-			// C. EMPRESS / .1911 Crack directory
+			// C. Standalone .1911 directory
 			empress1911 := filepath.Join(uDir, "AppData", "Roaming", ".1911", "Red Dead Redemption 2", "profile")
 			syncSaveFiles(empress1911, saveFiles)
 
@@ -115,7 +115,7 @@ func HandleRockstarGamesAlignment(targetDir, appID string) {
 			goldbergGTAV := filepath.Join(uDir, "AppData", "Roaming", "Goldberg SocialClub Emu Saves", "GTA V")
 			syncToProfilesFolder(goldbergGTAV, saveFiles, profileIDs)
 
-			// C. EMPRESS / .1911 Crack directory
+			// C. Standalone .1911 directory
 			empress1911 := filepath.Join(uDir, "AppData", "Roaming", ".1911", "GTAV", "profile")
 			syncSaveFiles(empress1911, saveFiles)
 		}

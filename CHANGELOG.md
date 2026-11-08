@@ -2,11 +2,23 @@
 
 All notable changes to Checkpoint are documented in this file.
 
+## [1.2.0] - 2026-11-08
+
+### Added
+- Added scanner and restorer detection for standalone offline profiles (.1911, Fairlight, and EMPRESS AppData roaming structures).
+- Added in-tree save detection and title alias resolution for Lies of P (AppID 1627720) across Unreal Engine portable directories.
+- Strengthened tarball creation resilience against dehydrated cloud storage placeholders (OneDrive Files On-Demand) to prevent corrupted archives and unexpected EOF errors.
+
+### Fixed
+- Fixed tar stream alignment when source files report nominal sizes but yield partial reads, padding to promised byte lengths to preserve archive structure.
+- Explicitly flushed and closed tar and gzip stream writers during vault packaging.
+- Sanitized internal alignment handlers and storage labels for standalone offline profiles.
+
 ## [1.1.5] - 2026-11-08
 
 ### Fixed
-- Fixed Red Dead Redemption 2 and Grand Theft Auto V restore failures on Linux prefixes where games ran under the Goldberg SocialClub emulator, EMPRESS/.1911, or non-steamuser Wine usernames.
-- Added automatic Rockstar Games alignment routine (HandleRockstarGamesAlignment) that auto-seeds saves into all active profile subfolders, Goldberg SocialClub Emu paths, and EMPRESS/.1911 directories.
+- Fixed Red Dead Redemption 2 and Grand Theft Auto V restore failures on Linux prefixes where games ran under the Goldberg SocialClub emulator, standalone .1911 profiles, or non-steamuser Wine usernames.
+- Added automatic Rockstar Games alignment routine (HandleRockstarGamesAlignment) that auto-seeds saves into all active profile subfolders, Goldberg SocialClub Emu paths, and standalone .1911 directories.
 - Mirrored restored Rockstar save data across all detected Wine user profiles (drive_c/users/steamuser and drive_c/users/<user>).
 - Added scanner detection for Goldberg SocialClub Emu Saves in AppData Roaming on both Windows and Linux prefixes.
 

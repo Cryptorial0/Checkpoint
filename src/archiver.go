@@ -253,12 +253,9 @@ func createTarGzFiltered(sourceDir, tarGzPath string, excluded map[string]bool) 
 	defer tarFile.Close()
 
 	gw := gzip.NewWriter(tarFile)
-	defer gw.Close()
-
 	tw := tar.NewWriter(gw)
-	defer tw.Close()
 
-	return filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+	walkErr := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			// Skip unreadable files or permission errors without failing the archive
 			return nil
@@ -293,20 +290,47 @@ func createTarGzFiltered(sourceDir, tarGzPath string, excluded map[string]bool) 
 		}
 		header.Name = filepath.ToSlash(relPath)
 
-		if err := tw.WriteHeader(header); err != nil {
+		if info.IsDir() {
+			_ = tw.WriteHeader(header)
 			return nil
 		}
 
-		if !info.IsDir() {
-			file, err := os.Open(path)
-			if err != nil {
-				return nil
-			}
-			defer file.Close()
-			_, _ = io.Copy(tw, file)
+		// Non-directory file: open first to verify accessibility
+		file, err := os.Open(path)
+		if err != nil {
+			// File cannot be opened (e.g. offline cloud placeholder or permission lock);
+			// do not write header with phantom size to prevent tar stream corruption
+			return nil
 		}
+
+		if err := tw.WriteHeader(header); err != nil {
+			file.Close()
+			return nil
+		}
+
+		written, copyErr := io.Copy(tw, file)
+		file.Close()
+
+		// If cloud placeholder or truncated read resulted in fewer bytes than header promised,
+		// pad with zeros so subsequent tar entries remain aligned and don't trigger unexpected EOF
+		if copyErr == nil && written < header.Size {
+			padSize := header.Size - written
+			zeroPad := make([]byte, padSize)
+			_, _ = tw.Write(zeroPad)
+		}
+
 		return nil
 	})
+
+	// Explicitly close tar and gzip writers to ensure end-of-archive blocks are flushed
+	if cErr := tw.Close(); cErr != nil && walkErr == nil {
+		walkErr = cErr
+	}
+	if cErr := gw.Close(); cErr != nil && walkErr == nil {
+		walkErr = cErr
+	}
+
+	return walkErr
 }
 
 func zipDirectory(sourceDir, zipFilePath, skipFilename string) error {
