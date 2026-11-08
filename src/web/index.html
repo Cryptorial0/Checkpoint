@@ -14,11 +14,11 @@
       <div class="brand">
         <img src="icon.svg" class="app-logo" alt="Checkpoint Logo" width="28" height="28">
         <h1>Checkpoint</h1>
-        <span class="badge" id="app-version-badge" style="background-color: #2ea043; color: #0d1117; font-weight: bold; border-color: #2ea043;">v1.1.4</span>
+        <span class="badge" id="app-version-badge" style="background-color: #2ea043; color: #0d1117; font-weight: bold; border-color: #2ea043;">v1.1.5</span>
         <span class="badge" id="os-badge" style="background-color: #1f6feb; color: #ffffff;">Linux</span>
       </div>
       <div style="display: flex; align-items: center; gap: 10px;">
-        <button id="btn-update-available" class="btn-subtle hidden" style="font-size: 12px; border-color: #2ea043; color: #2ea043; font-weight: 600;" type="button">Update Available (<span id="update-badge-version">v1.1.4</span>)</button>
+        <button id="btn-update-available" class="btn-subtle hidden" style="font-size: 12px; border-color: #2ea043; color: #2ea043; font-weight: 600;" type="button">Update Available (<span id="update-badge-version">v1.1.5</span>)</button>
         <div class="mode-toggle-group" id="mode-switcher">
           <button id="btn-mode-backup" class="mode-btn active" type="button">Backup Saves</button>
           <button id="btn-mode-restore" class="mode-btn" type="button">Restore Saves</button>
@@ -38,19 +38,19 @@
     <section id="restore-content" class="hidden">
       <div class="card">
         <div class="card-title">Select Backup Vault Archive</div>
-        <p class="description">Select a <code>game_saves_bundle.zip</code> archive or uncompressed vault folder to inspect and restore game saves.</p>
+        <p class="description">Select a <code>checkpoint-ddmmyy.zip</code> archive or uncompressed vault folder to inspect and restore game saves.</p>
 
         <!-- Drag & Drop Zone -->
         <div id="vault-drop-zone" class="drop-zone">
           <svg class="drop-zone-icon" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
-          <div style="font-size: 13px; font-weight: 600; color: #f0f6fc;">Drag & drop game_saves_bundle.zip here</div>
+          <div style="font-size: 13px; font-weight: 600; color: #f0f6fc;">Drag & drop Checkpoint vault archive (.zip) here</div>
           <div style="font-size: 11px; color: #8b949e; margin-top: 4px;">or click below to browse</div>
         </div>
 
         <div class="input-row">
             <label for="vault-path">Vault Archive Path (.zip or folder):</label>
             <div class="input-group">
-              <input type="text" id="vault-path" placeholder="Click Browse to select game_saves_bundle.zip...">
+              <input type="text" id="vault-path" placeholder="Click Browse to select checkpoint vault archive (.zip)...">
               <button id="btn-browse-vault" class="btn-subtle" type="button">Browse (.zip)...</button>
               <button id="btn-inspect-vault" class="btn-primary" type="button">
                 <span id="inspect-spinner" class="spinner hidden"></span>

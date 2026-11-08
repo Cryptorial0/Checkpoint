@@ -65,7 +65,7 @@ func main() {
 	versionLongFlag := flag.Bool("version", false, "Show version and exit")
 	cliFlag := flag.Bool("cli", false, "Run in terminal CLI mode without GUI")
 	nativeFlag := flag.Bool("native", false, "Force raw Win32 fallback GUI instead of modern standalone window")
-	restoreFlag := flag.String("restore", "", "Path to game_saves_bundle.zip or vault directory to restore")
+	restoreFlag := flag.String("restore", "", "Path to checkpoint-ddmmyy.zip or vault directory to restore")
 	autoFlag := flag.Bool("auto", false, "Automatically restore all resolvable games in CLI mode")
 	scanWindowsFlag := flag.String("scan-windows", "", "Path to mounted Windows volume or root (e.g. /mnt/windows)")
 	flag.Parse()
@@ -382,9 +382,12 @@ func main() {
 		}
 		_ = SaveConfig(cfg)
 
-		zipPath := filepath.Join(dest, "game_saves_bundle.zip")
-		if strings.HasSuffix(strings.ToLower(dest), ".zip") {
-			zipPath = dest
+		zipPath := manifest.ArchivePath
+		if zipPath == "" {
+			zipPath = filepath.Join(dest, DefaultVaultArchiveName(time.Now()))
+			if strings.HasSuffix(strings.ToLower(dest), ".zip") {
+				zipPath = dest
+			}
 		}
 		verReport, _ := VerifyZipIntegrity(zipPath)
 

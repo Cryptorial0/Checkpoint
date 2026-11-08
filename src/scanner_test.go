@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestScanBloodborneAndDarkestDungeon(t *testing.T) {
@@ -1429,6 +1430,112 @@ func TestFastStartupHandlers(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultVaultArchiveName(t *testing.T) {
+	fixedTime := time.Date(2026, time.November, 8, 14, 30, 0, 0, time.UTC)
+	name := DefaultVaultArchiveName(fixedTime)
+	expected := "checkpoint-081126.zip"
+	if name != expected {
+		t.Fatalf("Expected archive name %q, got %q", expected, name)
+	}
+
+	current := DefaultVaultArchiveName(time.Time{})
+	if !strings.HasPrefix(current, "checkpoint-") || !strings.HasSuffix(current, ".zip") {
+		t.Fatalf("Expected archive name matching checkpoint-*.zip, got %q", current)
+	}
+}
+
+func TestCreateBackupArchiveNaming(t *testing.T) {
+	tempSrc := t.TempDir()
+	tempDest := t.TempDir()
+
+	testFile := filepath.Join(tempSrc, "save.dat")
+	if err := os.WriteFile(testFile, []byte("test save data"), 0644); err != nil {
+		t.Fatalf("Failed to create test save file: %v", err)
+	}
+
+	game := DetectedGame{
+		ID:                 "test-game-1",
+		Name:               "Test Game",
+		AppID:              "999999",
+		SaveType:           SaveTypeInTree,
+		StorageType:        "Direct",
+		SourcePath:         tempSrc,
+		TargetRelativePath: "TestGame/saves",
+		FileCount:          1,
+		SizeBytes:          14,
+	}
+
+	manifest, err := CreateBackupWithOptions([]DetectedGame{game}, tempDest, true, false)
+	if err != nil {
+		t.Fatalf("CreateBackupWithOptions failed: %v", err)
+	}
+
+	expectedName := DefaultVaultArchiveName(time.Now())
+	expectedPath := filepath.Join(tempDest, expectedName)
+
+	if manifest.ArchivePath != expectedPath {
+		t.Errorf("Expected manifest.ArchivePath %q, got %q", expectedPath, manifest.ArchivePath)
+	}
+
+	if _, err := os.Stat(expectedPath); err != nil {
+		t.Errorf("Expected archive file %q to exist on disk: %v", expectedPath, err)
+	}
+
+	inspected, err := InspectVault(expectedPath)
+	if err != nil {
+		t.Fatalf("InspectVault failed on new vault: %v", err)
+	}
+	if len(inspected.Games) != 1 || inspected.Games[0].GameName != "Test Game" {
+		t.Errorf("Unexpected inspected manifest games: %+v", inspected.Games)
+	}
+}
+
+func TestFindCandidateVaultsDetection(t *testing.T) {
+	tempHome := t.TempDir()
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	os.Setenv("HOME", tempHome)
+
+	downloads := filepath.Join(tempHome, "Downloads")
+	if err := os.MkdirAll(downloads, 0755); err != nil {
+		t.Fatalf("Failed to create downloads dir: %v", err)
+	}
+
+	f1 := filepath.Join(downloads, "checkpoint-081126.zip")
+	f2 := filepath.Join(downloads, "game_saves_bundle.zip")
+	f3 := filepath.Join(downloads, "unrelated_file.zip")
+
+	_ = os.WriteFile(f1, []byte("dummy"), 0644)
+	_ = os.WriteFile(f2, []byte("dummy"), 0644)
+	_ = os.WriteFile(f3, []byte("dummy"), 0644)
+
+	found := FindCandidateVaults()
+	var hasCheckpoint, hasBundle, hasUnrelated bool
+	for _, p := range found {
+		if strings.HasSuffix(p, "checkpoint-081126.zip") {
+			hasCheckpoint = true
+		}
+		if strings.HasSuffix(p, "game_saves_bundle.zip") {
+			hasBundle = true
+		}
+		if strings.HasSuffix(p, "unrelated_file.zip") {
+			hasUnrelated = true
+		}
+	}
+
+	if !hasCheckpoint {
+		t.Errorf("Expected FindCandidateVaults to discover checkpoint-081126.zip, got: %v", found)
+	}
+	if !hasBundle {
+		t.Errorf("Expected FindCandidateVaults to discover game_saves_bundle.zip, got: %v", found)
+	}
+	if hasUnrelated {
+		t.Errorf("FindCandidateVaults should not match unrelated zip files: %v", found)
+	}
+}
+
+
 
 
 

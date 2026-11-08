@@ -19,6 +19,15 @@ type VaultManifest struct {
 	OS          string         `json:"source_os"`
 	Games       []GameSaveMeta `json:"games"`
 	OnlineGames []OnlineGame   `json:"online_games,omitempty"`
+	ArchivePath string         `json:"archive_path,omitempty"`
+}
+
+// DefaultVaultArchiveName returns standard backup vault filename: checkpoint-ddmmyy.zip
+func DefaultVaultArchiveName(t time.Time) string {
+	if t.IsZero() {
+		t = time.Now()
+	}
+	return fmt.Sprintf("checkpoint-%s.zip", t.Format("020106"))
 }
 
 type GameSaveMeta struct {
@@ -143,14 +152,16 @@ func CreateBackupWithOptions(games []DetectedGame, destDir string, createSingleZ
 	_ = os.WriteFile(filepath.Join(stageDir, "locations.json"), locBytes, 0644)
 
 	// Package staging directly into a single zip in destDir
-	SetProgress("backup", 80, fmt.Sprintf("Packaging %d game saves into archive bundle...", len(games)), len(games), len(games), "Creating game_saves_bundle.zip")
-	zipPath := filepath.Join(destDir, "game_saves_bundle.zip")
+	archiveName := DefaultVaultArchiveName(time.Now())
+	SetProgress("backup", 80, fmt.Sprintf("Packaging %d game saves into archive bundle...", len(games)), len(games), len(games), fmt.Sprintf("Creating %s", archiveName))
+	zipPath := filepath.Join(destDir, archiveName)
 	if strings.HasSuffix(strings.ToLower(destDir), ".zip") {
 		zipPath = destDir
 	}
 	if err := zipDirectory(stageDir, zipPath, ""); err != nil {
 		return nil, fmt.Errorf("failed to create zip bundle: %w", err)
 	}
+	manifest.ArchivePath = zipPath
 
 	// Immediate post-backup self-test
 	rep, err := VerifyZipIntegrity(zipPath)

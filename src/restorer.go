@@ -1273,6 +1273,9 @@ func RestoreGame(sourcePath string, meta GameSaveMeta, customDestDir string, con
 	// Align FromSoftware SteamID & MD5 checksums if running inside Proton/Wine
 	HandleFromSoftwareAlignment(targetDir, meta.AppID)
 
+	// Align Rockstar Games (RDR2, GTA V) profile directories, emulators & Wine user prefixes
+	HandleRockstarGamesAlignment(targetDir, meta.AppID)
+
 	report.Success = true
 	return report
 }
@@ -1618,7 +1621,7 @@ func FindCandidateVaults() []string {
 		for _, e := range entries {
 			if !e.IsDir() && strings.HasSuffix(strings.ToLower(e.Name()), ".zip") {
 				nameLow := strings.ToLower(e.Name())
-				if strings.Contains(nameLow, "bundle") || strings.Contains(nameLow, "save") {
+				if strings.Contains(nameLow, "checkpoint") || strings.Contains(nameLow, "bundle") || strings.Contains(nameLow, "save") {
 					full := filepath.Join(dir, e.Name())
 					if !seen[full] {
 						seen[full] = true

@@ -384,8 +384,9 @@ func onBackupClicked() {
 		Log("Backup error: %v", err)
 		setWindowText(hLblStatus, "Backup error: "+err.Error())
 	} else {
+		archiveName := DefaultVaultArchiveName(time.Now())
 		Log("Backup successfully created at " + dest)
-		setWindowText(hLblStatus, "Backup completed successfully! Created: "+filepath.Join(dest, "game_saves_bundle.zip"))
+		setWindowText(hLblStatus, "Backup completed successfully! Created: "+filepath.Join(dest, archiveName))
 	}
 }
 

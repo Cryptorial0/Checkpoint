@@ -1226,7 +1226,9 @@ document.getElementById("btn-backup").addEventListener("click", async () => {
       const manifest = result.manifest || result;
       const count = manifest.games ? manifest.games.length : (result.games ? result.games.length : selectedGames.length);
       log(`Backup successfully completed! Total games archived: ${count}`);
-      const zipPath = result.zip_path || `${destPath}/game_saves_bundle.zip`;
+      const d = new Date();
+      const ddmmyy = `${String(d.getDate()).padStart(2, "0")}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getFullYear()).slice(-2)}`;
+      const zipPath = result.zip_path || `${destPath}/checkpoint-${ddmmyy}.zip`;
       log(`Created archive: ${zipPath}`);
 
       // Verification Card
@@ -1430,7 +1432,7 @@ if (btnInspectVault) {
   btnInspectVault.addEventListener("click", () => {
     const path = vaultPathInput ? vaultPathInput.value.trim() : "";
     if (!path) {
-      alert("Please select or enter the path to game_saves_bundle.zip first.");
+      alert("Please select or enter the path to a Checkpoint vault archive (.zip) first.");
       return;
     }
     inspectVault(path);

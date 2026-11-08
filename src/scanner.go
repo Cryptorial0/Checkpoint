@@ -1694,6 +1694,9 @@ func scanUserAppData(games *[]DetectedGame, seen map[string]bool) {
 		goldbergBase := filepath.Join(appData, "Goldberg SteamEmu Saves")
 		scanAppIDSubdirs(goldbergBase, "Offline Profile", "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves", games, seen)
 
+		goldbergSCBase := filepath.Join(appData, "Goldberg SocialClub Emu Saves")
+		scanGoldbergSocialClubSubdirs(goldbergSCBase, games, seen)
+
 		// FLT
 		fltBase := filepath.Join(appData, "FLT")
 		scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
@@ -3836,6 +3839,64 @@ func scanAppIDSubdirs(basePath, storageType, targetRelBase string, games *[]Dete
 	}
 }
 
+func scanGoldbergSocialClubSubdirs(basePath string, games *[]DetectedGame, seen map[string]bool) {
+	entries, err := os.ReadDir(basePath)
+	if err != nil {
+		return
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dirName := entry.Name()
+		dirLow := strings.ToLower(dirName)
+
+		var appID, gameName string
+		if dirLow == "rdr2" || strings.Contains(dirLow, "red dead") {
+			appID = "1174180"
+			gameName = "Red Dead Redemption 2"
+		} else if dirLow == "gta v" || dirLow == "gtav" || strings.Contains(dirLow, "grand theft auto v") {
+			appID = "271590"
+			gameName = "Grand Theft Auto V"
+		} else {
+			continue
+		}
+
+		fullPath := filepath.Join(basePath, dirName)
+		canonical := getCanonicalPath(fullPath)
+		if seen[canonical] || seen[fullPath] {
+			continue
+		}
+
+		fileCount, size := getDirStats(fullPath)
+		if fileCount == 0 || size <= 16 {
+			continue
+		}
+
+		seen[canonical] = true
+		seen[fullPath] = true
+
+		targetRel := filepath.ToSlash(filepath.Join("users/steamuser/AppData/Roaming/Goldberg SocialClub Emu Saves", dirName))
+		iconURL := getSteamIconURL(appID)
+		protonTier := fetchProtonDBTier(appID)
+
+		*games = append(*games, DetectedGame{
+			ID:                 fmt.Sprintf("goldberg_sc_%s", appID),
+			Name:               fmt.Sprintf("%s (Offline Profile)", gameName),
+			AppID:              appID,
+			SaveType:           SaveTypeInTree,
+			StorageType:        "Offline Profile",
+			SourcePath:         fullPath,
+			TargetRelativePath: targetRel,
+			FileCount:          fileCount,
+			SizeBytes:          size,
+			IconURL:            iconURL,
+			ProtonTier:         protonTier,
+		})
+	}
+}
+
 var ignoredSystemDirs = map[string]bool{
 	"system volume information": true,
 	"$recycle.bin":              true,
@@ -4825,6 +4886,8 @@ func scanWinePrefix(prefixRoot string, originAppID string, games *[]DetectedGame
 		if stat, err := os.Stat(roamingApp); err == nil && stat.IsDir() {
 			goldbergBase := filepath.Join(roamingApp, "Goldberg SteamEmu Saves")
 			scanAppIDSubdirs(goldbergBase, "Offline Profile", "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves", games, seen)
+			goldbergSCBase := filepath.Join(roamingApp, "Goldberg SocialClub Emu Saves")
+			scanGoldbergSocialClubSubdirs(goldbergSCBase, games, seen)
 			fltBase := filepath.Join(roamingApp, "FLT")
 			scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
 
@@ -5187,6 +5250,8 @@ func ScanWindowsVolume(mountPath string, games *[]DetectedGame, seen map[string]
 		if stat, err := os.Stat(roamingApp); err == nil && stat.IsDir() {
 			goldbergBase := filepath.Join(roamingApp, "Goldberg SteamEmu Saves")
 			scanAppIDSubdirs(goldbergBase, "Offline Profile", "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves", games, seen)
+			goldbergSCBase := filepath.Join(roamingApp, "Goldberg SocialClub Emu Saves")
+			scanGoldbergSocialClubSubdirs(goldbergSCBase, games, seen)
 			fltBase := filepath.Join(roamingApp, "FLT")
 			scanAppIDSubdirs(fltBase, "Offline Profile", "users/steamuser/AppData/Roaming/FLT", games, seen)
 

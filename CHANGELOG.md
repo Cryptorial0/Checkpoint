@@ -2,6 +2,18 @@
 
 All notable changes to Checkpoint are documented in this file.
 
+## [1.1.5] - 2026-11-08
+
+### Fixed
+- Fixed Red Dead Redemption 2 and Grand Theft Auto V restore failures on Linux prefixes where games ran under the Goldberg SocialClub emulator, EMPRESS/.1911, or non-steamuser Wine usernames.
+- Added automatic Rockstar Games alignment routine (HandleRockstarGamesAlignment) that auto-seeds saves into all active profile subfolders, Goldberg SocialClub Emu paths, and EMPRESS/.1911 directories.
+- Mirrored restored Rockstar save data across all detected Wine user profiles (drive_c/users/steamuser and drive_c/users/<user>).
+- Added scanner detection for Goldberg SocialClub Emu Saves in AppData Roaming on both Windows and Linux prefixes.
+
+### Added
+- Updated default backup vault archive naming scheme from game_saves_bundle.zip to checkpoint-ddmmyy.zip (e.g. checkpoint-081126.zip) based on creation date.
+- Added candidate vault discovery support for checkpoint-*.zip archives while preserving full backwards compatibility for legacy game_saves_bundle.zip archives.
+
 ## [1.1.4] - 2026-11-07
 
 ### Fixed
