@@ -155,7 +155,8 @@ jobs:
           curl -sL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o /tmp/appimagetool
           chmod +x /tmp/appimagetool
           (cd /tmp && ./appimagetool --appimage-extract)
-          ARCH=x86_64 /tmp/squashfs-root/AppRun -u "gh-releases-zsync|Cryptorial0|Checkpoint|latest|checkpoint-*.AppImage.zsync" AppDir "dist/checkpoint-${TAG_NAME}.AppImage"
+          (cd dist && ARCH=x86_64 /tmp/squashfs-root/AppRun -u "gh-releases-zsync|Cryptorial0|Checkpoint|latest|checkpoint-*.AppImage.zsync" ../AppDir "checkpoint-${TAG_NAME}.AppImage")
+          mv -f *.zsync dist/ 2>/dev/null || true
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -163,7 +164,8 @@ jobs:
           name: dist-linux
           path: |
             dist/checkpoint
-            dist/checkpoint-*.AppImage*
+            dist/checkpoint-*.AppImage
+            dist/checkpoint-*.zsync
           retention-days: 1
 
   publish:
