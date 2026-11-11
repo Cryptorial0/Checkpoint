@@ -29,6 +29,7 @@ static int run_gtk_webview(const char* title, const char* url, int width, int he
         snprintf(bundle_path, sizeof(bundle_path), "%s/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/injected-bundle", appdir);
         g_setenv("WEBKIT_INJECTED_BUNDLE_PATH", bundle_path, 1);
 
+        g_setenv("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1", 1);
         g_setenv("WEBKIT_FORCE_SANDBOX", "0", 1);
         g_setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 0);
         g_setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 0);

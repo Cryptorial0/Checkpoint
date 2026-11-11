@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://ko-fi.com/cryptorial"><img src="https://img.shields.io/badge/Support%20on%20Ko--fi-2ea043?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" alt="License: GPL v3"></a>
-  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v1.2.2-00d2aa?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/Cryptorial0/Checkpoint/releases"><img src="https://img.shields.io/badge/Release-v1.2.3-00d2aa?style=for-the-badge" alt="Release"></a>
 </p>
 
 Checkpoint backs up and restores PC game saves across Windows, Linux, and Steam Deck. Instead of hunting through AppData or matching Proton prefix IDs in `compatdata` by hand, Checkpoint finds your saves, packages them into a verified archive, and restores them to the correct paths on the destination machine.
@@ -20,13 +20,13 @@ Checkpoint backs up and restores PC game saves across Windows, Linux, and Steam 
 
 ## Downloads
 
-Binaries for release 1.2.2:
+Binaries for release 1.2.3:
 
 | Platform | Format | Description | Download |
 | :--- | :--- | :--- | :--- |
-| Linux | AppImage | Portable package for all Linux distributions | [checkpoint-v1.2.2.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.2.2/checkpoint-v1.2.2.AppImage) |
-| Linux | Binary | Standalone 64-bit ELF binary | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.2.2/checkpoint) |
-| Windows | Executable | Standalone 64-bit Windows binary | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.2.2/checkpoint.exe) |
+| Linux | AppImage | Portable package for all Linux distributions | [checkpoint-v1.2.3.AppImage](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.2.3/checkpoint-v1.2.3.AppImage) |
+| Linux | Binary | Standalone 64-bit ELF binary | [checkpoint](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.2.3/checkpoint) |
+| Windows | Executable | Standalone 64-bit Windows binary | [checkpoint.exe](https://github.com/Cryptorial0/Checkpoint/releases/download/v1.2.3/checkpoint.exe) |
 
 Checksums and past versions are on the [GitHub Releases](https://github.com/Cryptorial0/Checkpoint/releases) page. Checkpoint is licensed under GPLv3. See [PRIVACY.md](PRIVACY.md) for telemetry details.
 

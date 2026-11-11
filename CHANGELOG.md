@@ -2,6 +2,13 @@
 
 All notable changes to Checkpoint are documented in this file.
 
+## [1.2.3] - 2026-11-11
+
+### Fixed
+- Patched WebKit2GTK hardcoded PKGLIBEXECDIR inside the bundled shared library to resolve helper process execution in unprivileged container environments.
+- Staged WebKit helper processes (WebKitNetworkProcess and WebKitWebProcess) into /tmp at runtime to bypass container path isolation.
+- Configured WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 to support execution in nested firejail test runners.
+
 ## [1.2.2] - 2026-11-11
 
 ### Fixed

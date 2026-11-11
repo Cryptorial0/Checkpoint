@@ -126,21 +126,50 @@ jobs:
           fi
           /tmp/linuxdeploy --appdir AppDir -e AppDir/usr/bin/checkpoint $EXTRA_EXECS -d AppDir/checkpoint.desktop -i AppDir/checkpoint.png --plugin gtk
 
+          # Patch WebKit2GTK hardcoded PKGLIBEXECDIR paths to allow portable execution
+          python3 -c "
+          import glob
+          for path in glob.glob('AppDir/usr/lib/**/libwebkit2gtk-4.1.so.0', recursive=True):
+              with open(path, 'rb') as f:
+                  data = bytearray(f.read())
+              old1 = b'/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1\x00'
+              new1 = b'/tmp/.checkpoint_webkit41\x00'.ljust(len(old1), b'\x00')
+              old2 = b'/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/injected-bundle/\x00'
+              new2 = b'/tmp/.checkpoint_webkit41/bundle/\x00'.ljust(len(old2), b'\x00')
+              if old1 in data:
+                  data = data.replace(old1, new1)
+                  print('Patched PKGLIBEXECDIR in', path)
+              if old2 in data:
+                  data = data.replace(old2, new2)
+                  print('Patched injected-bundle in', path)
+              with open(path, 'wb') as f:
+                  f.write(data)
+          "
+
           # Replace AppRun with wrapper script ensuring WebKit subprocesses find their bundle
           rm -f AppDir/AppRun
           cat << 'EOF' > AppDir/AppRun
-          #!/bin/sh
-          SELF=$(readlink -f "$0")
-          HERE=${SELF%/*}
-          export APPDIR="$HERE"
-          export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
-          export WEBKIT_EXEC_PATH="$HERE/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1"
-          export WEBKIT_INJECTED_BUNDLE_PATH="$HERE/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/injected-bundle"
-          export WEBKIT_FORCE_SANDBOX=0
-          export WEBKIT_DISABLE_COMPOSITING_MODE=1
-          export WEBKIT_DISABLE_DMABUF_RENDERER=1
-          exec "$HERE/usr/bin/checkpoint" "$@"
-          EOF
+#!/bin/sh
+SELF=$(readlink -f "$0")
+HERE=${SELF%/*}
+export APPDIR="$HERE"
+export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
+export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
+export WEBKIT_FORCE_SANDBOX=0
+export WEBKIT_DISABLE_COMPOSITING_MODE=1
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
+
+TARGET_DIR="/tmp/.checkpoint_webkit41"
+mkdir -p "$TARGET_DIR/bundle"
+for f in "$HERE"/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/*; do
+  [ -f "$f" ] && (ln -sf "$f" "$TARGET_DIR/" 2>/dev/null || cp -f "$f" "$TARGET_DIR/" 2>/dev/null)
+done
+for f in "$HERE"/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/injected-bundle/*; do
+  [ -f "$f" ] && (ln -sf "$f" "$TARGET_DIR/bundle/" 2>/dev/null || cp -f "$f" "$TARGET_DIR/bundle/" 2>/dev/null)
+done
+
+exec "$HERE/usr/bin/checkpoint" "$@"
+EOF
           chmod +x AppDir/AppRun
 
           # Package AppImage with appimagetool
