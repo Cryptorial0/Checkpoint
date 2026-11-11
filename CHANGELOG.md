@@ -2,6 +2,13 @@
 
 All notable changes to Checkpoint are documented in this file.
 
+## [1.2.1] - 2026-11-11
+
+### Fixed
+- Fixed AppImage portability failure where `libwebkit2gtk-4.1.so.0` was missing on minimal Linux systems and SteamOS.
+- Integrated `linuxdeploy` and `linuxdeploy-plugin-gtk` into GitHub Actions release workflow to bundle WebKit2GTK, GTK3, and shared runtime libraries into the AppImage.
+- Lowered Linux CI build runner target from Ubuntu 24.04 to Ubuntu 22.04 LTS to reduce required GLIBC version to 2.35 for wider distribution compatibility.
+
 ## [1.2.0] - 2026-11-08
 
 ### Added
