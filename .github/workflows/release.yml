@@ -199,5 +199,6 @@ jobs:
             dist/checkpoint.exe
             dist/checkpoint
             dist/checkpoint-*.AppImage
+            dist/checkpoint-*.AppImage.zsync
             dist/SHA256SUMS.txt
           generate_release_notes: true
