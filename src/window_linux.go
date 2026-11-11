@@ -18,12 +18,27 @@ static int run_gtk_webview(const char* title, const char* url, int width, int he
     g_set_prgname("checkpoint");
     g_set_application_name("Checkpoint");
 
+    // 2. Configure WebKit subprocess paths and sandboxing if running inside AppImage
+    const char* appdir = g_getenv("APPDIR");
+    if (appdir) {
+        char exec_path[1024];
+        snprintf(exec_path, sizeof(exec_path), "%s/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1", appdir);
+        g_setenv("WEBKIT_EXEC_PATH", exec_path, 1);
+
+        char bundle_path[1024];
+        snprintf(bundle_path, sizeof(bundle_path), "%s/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/injected-bundle", appdir);
+        g_setenv("WEBKIT_INJECTED_BUNDLE_PATH", bundle_path, 1);
+
+        g_setenv("WEBKIT_FORCE_SANDBOX", "0", 1);
+        g_setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 0);
+        g_setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 0);
+    }
+
     if (!gtk_init_check(NULL, NULL)) {
         return 0;
     }
 
-    // 2. Add AppDir paths to GTK icon search path if running inside an AppImage
-    const char* appdir = g_getenv("APPDIR");
+    // 3. Add AppDir paths to GTK icon search path if running inside an AppImage
     if (appdir) {
         GtkIconTheme *theme = gtk_icon_theme_get_default();
         if (theme) {

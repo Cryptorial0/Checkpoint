@@ -2,6 +2,13 @@
 
 All notable changes to Checkpoint are documented in this file.
 
+## [1.2.2] - 2026-11-11
+
+### Fixed
+- Fixed WebKit2GTK child process spawning crash in AppImages (`WebKitNetworkProcess` / `WebKitWebProcess` no such file or directory) by bundling helper processes into `AppDir/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1`.
+- Configured runtime environment variables (`WEBKIT_EXEC_PATH`, `WEBKIT_INJECTED_BUNDLE_PATH`, `WEBKIT_FORCE_SANDBOX=0`) in both `AppRun` and native Linux window initialization.
+- Added software compositing fallbacks for headless CI environments, nested Firejail containers, and NVIDIA drivers.
+
 ## [1.2.1] - 2026-11-11
 
 ### Fixed

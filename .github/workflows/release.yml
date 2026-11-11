@@ -102,6 +102,15 @@ jobs:
             touch AppDir/checkpoint.png AppDir/.DirIcon
           fi
 
+          # Bundle WebKit2GTK helper processes (WebKitNetworkProcess, WebKitWebProcess)
+          WEBKIT_DIR=$(dirname $(find /usr/lib -name "WebKitNetworkProcess" 2>/dev/null | head -n 1))
+          if [ -n "$WEBKIT_DIR" ] && [ -d "$WEBKIT_DIR" ]; then
+            mkdir -p AppDir/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1
+            cp -r "${WEBKIT_DIR}/"* AppDir/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/
+            mkdir -p AppDir/usr/libexec/webkit2gtk-4.1
+            cp -r "${WEBKIT_DIR}/"* AppDir/usr/libexec/webkit2gtk-4.1/
+          fi
+
           # Download linuxdeploy and GTK plugin
           curl -sL https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -o /tmp/linuxdeploy
           chmod +x /tmp/linuxdeploy
@@ -111,7 +120,28 @@ jobs:
 
           # Run linuxdeploy with GTK plugin to bundle WebKit2GTK and GTK runtime dependencies
           export PATH="/tmp:$PATH"
-          /tmp/linuxdeploy --appdir AppDir -e AppDir/usr/bin/checkpoint -d AppDir/checkpoint.desktop -i AppDir/checkpoint.png --plugin gtk
+          EXTRA_EXECS=""
+          if [ -f "AppDir/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess" ]; then
+            EXTRA_EXECS="-e AppDir/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess -e AppDir/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess"
+          fi
+          /tmp/linuxdeploy --appdir AppDir -e AppDir/usr/bin/checkpoint $EXTRA_EXECS -d AppDir/checkpoint.desktop -i AppDir/checkpoint.png --plugin gtk
+
+          # Replace AppRun with wrapper script ensuring WebKit subprocesses find their bundle
+          rm -f AppDir/AppRun
+          cat << 'EOF' > AppDir/AppRun
+          #!/bin/sh
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export APPDIR="$HERE"
+          export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
+          export WEBKIT_EXEC_PATH="$HERE/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1"
+          export WEBKIT_INJECTED_BUNDLE_PATH="$HERE/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/injected-bundle"
+          export WEBKIT_FORCE_SANDBOX=0
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          export WEBKIT_DISABLE_DMABUF_RENDERER=1
+          exec "$HERE/usr/bin/checkpoint" "$@"
+          EOF
+          chmod +x AppDir/AppRun
 
           # Package AppImage with appimagetool
           curl -sL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o /tmp/appimagetool
