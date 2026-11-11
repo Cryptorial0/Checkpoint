@@ -148,28 +148,7 @@ jobs:
 
           # Replace AppRun with wrapper script ensuring WebKit subprocesses find their bundle
           rm -f AppDir/AppRun
-          cat << 'EOF' > AppDir/AppRun
-#!/bin/sh
-SELF=$(readlink -f "$0")
-HERE=${SELF%/*}
-export APPDIR="$HERE"
-export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
-export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
-export WEBKIT_FORCE_SANDBOX=0
-export WEBKIT_DISABLE_COMPOSITING_MODE=1
-export WEBKIT_DISABLE_DMABUF_RENDERER=1
-
-TARGET_DIR="/tmp/.checkpoint_webkit41"
-mkdir -p "$TARGET_DIR/bundle"
-for f in "$HERE"/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/*; do
-  [ -f "$f" ] && (ln -sf "$f" "$TARGET_DIR/" 2>/dev/null || cp -f "$f" "$TARGET_DIR/" 2>/dev/null)
-done
-for f in "$HERE"/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/injected-bundle/*; do
-  [ -f "$f" ] && (ln -sf "$f" "$TARGET_DIR/bundle/" 2>/dev/null || cp -f "$f" "$TARGET_DIR/bundle/" 2>/dev/null)
-done
-
-exec "$HERE/usr/bin/checkpoint" "$@"
-EOF
+          cp packaging/AppRun AppDir/AppRun
           chmod +x AppDir/AppRun
 
           # Package AppImage with appimagetool
