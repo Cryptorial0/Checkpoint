@@ -16,13 +16,13 @@ import (
 	"time"
 )
 
-const AppVersion = "1.2.3"
+const AppVersion = "1.2.4"
 
 const (
 	githubRepoOwner   = "Cryptorial0"
 	githubRepoName    = "Checkpoint"
 	githubReleasesURL = "https://api.github.com/repos/Cryptorial0/Checkpoint/releases/latest"
-	httpUserAgent     = "Checkpoint-Migrator/1.2.3"
+	httpUserAgent     = "Checkpoint-Migrator/1.2.4"
 )
 
 type ReleaseAsset struct {

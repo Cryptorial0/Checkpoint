@@ -2,6 +2,12 @@
 
 All notable changes to Checkpoint are documented in this file.
 
+## [1.2.4] - 2026-11-11
+
+### Added
+- Embedded AppImageUpdate zsync delta update metadata into the AppImage header.
+- Automated publication of companion .zsync manifests alongside AppImage release assets.
+
 ## [1.2.3] - 2026-11-11
 
 ### Fixed

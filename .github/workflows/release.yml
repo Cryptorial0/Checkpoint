@@ -58,7 +58,7 @@ jobs:
       - name: Install Linux Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev squashfs-tools file patchelf
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev squashfs-tools file patchelf zsync
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -151,11 +151,11 @@ jobs:
           cp packaging/AppRun AppDir/AppRun
           chmod +x AppDir/AppRun
 
-          # Package AppImage with appimagetool
+          # Package AppImage with appimagetool and embed zsync update information
           curl -sL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o /tmp/appimagetool
           chmod +x /tmp/appimagetool
           (cd /tmp && ./appimagetool --appimage-extract)
-          ARCH=x86_64 /tmp/squashfs-root/AppRun AppDir "dist/checkpoint-${TAG_NAME}.AppImage"
+          ARCH=x86_64 /tmp/squashfs-root/AppRun -u "gh-releases-zsync|Cryptorial0|Checkpoint|latest|checkpoint-*.AppImage.zsync" AppDir "dist/checkpoint-${TAG_NAME}.AppImage"
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -163,7 +163,7 @@ jobs:
           name: dist-linux
           path: |
             dist/checkpoint
-            dist/checkpoint-*.AppImage
+            dist/checkpoint-*.AppImage*
           retention-days: 1
 
   publish:
