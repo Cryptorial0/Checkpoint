@@ -104,7 +104,6 @@ func CreateBackupWithOptions(games []DetectedGame, destDir string, createSingleZ
 			SizeBytes:          g.SizeBytes,
 		}
 
-		// Write meta.json
 		metaBytes, err := json.MarshalIndent(meta, "", "  ")
 		if err != nil {
 			return nil, err
@@ -113,7 +112,6 @@ func CreateBackupWithOptions(games []DetectedGame, destDir string, createSingleZ
 			return nil, err
 		}
 
-		// Compress files into data.tar.gz with optional RPG pruning
 		tarPath := filepath.Join(gameFolder, "data.tar.gz")
 		var excluded map[string]bool
 		if optimizeRPG {
@@ -126,7 +124,6 @@ func CreateBackupWithOptions(games []DetectedGame, destDir string, createSingleZ
 		manifest.Games = append(manifest.Games, meta)
 	}
 
-	// Master index.json inside staging
 	idxBytes, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return nil, err
@@ -135,7 +132,6 @@ func CreateBackupWithOptions(games []DetectedGame, destDir string, createSingleZ
 		return nil, err
 	}
 
-	// locations.json storing full source paths and suggested Linux targets
 	locations := make(map[string]map[string]string)
 	for _, g := range games {
 		locations[g.ID] = map[string]string{
@@ -151,7 +147,6 @@ func CreateBackupWithOptions(games []DetectedGame, destDir string, createSingleZ
 	locBytes, _ := json.MarshalIndent(locations, "", "  ")
 	_ = os.WriteFile(filepath.Join(stageDir, "locations.json"), locBytes, 0644)
 
-	// Package staging directly into a single zip in destDir
 	archiveName := DefaultVaultArchiveName(time.Now())
 	SetProgress("backup", 80, fmt.Sprintf("Packaging %d game saves into archive bundle...", len(games)), len(games), len(games), fmt.Sprintf("Creating %s", archiveName))
 	zipPath := filepath.Join(destDir, archiveName)
@@ -163,7 +158,6 @@ func CreateBackupWithOptions(games []DetectedGame, destDir string, createSingleZ
 	}
 	manifest.ArchivePath = zipPath
 
-	// Immediate post-backup self-test
 	rep, err := VerifyZipIntegrity(zipPath)
 	if err != nil {
 		Log("Warning: zip integrity check failed: %v", err)

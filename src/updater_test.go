@@ -60,7 +60,7 @@ func TestFindMatchingAssetAppImageSelection(t *testing.T) {
 		{Name: "SHA256SUMS.txt", BrowserDownloadURL: "https://example.com/checksums"},
 	}
 
-	// 1. In AppImage mode: should match .AppImage
+	// In AppImage mode: should match .AppImage
 	t.Setenv("APPIMAGE", "/tmp/fake/checkpoint.AppImage")
 	matchedAppImg, err := findMatchingAsset(assets)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestFindMatchingAssetAppImageSelection(t *testing.T) {
 		t.Errorf("Expected AppImage asset, got %s", matchedAppImg.Name)
 	}
 
-	// 2. In non-AppImage mode: should match native ELF "checkpoint"
+	// In non-AppImage mode: should match native ELF "checkpoint"
 	t.Setenv("APPIMAGE", "")
 	matchedNative, err := findMatchingAsset(assets)
 	if err != nil {

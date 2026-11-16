@@ -37,7 +37,6 @@ func CheckSystem() SystemStatus {
 }
 
 func checkWindowsFastStartup() bool {
-	// Query registry directly with hidden window - no powershell
 	cmd := exec.Command("reg", "query", `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power`, "/v", "HiberbootEnabled")
 	cmd.SysProcAttr = hideWindowAttr()
 	out, err := cmd.Output()
@@ -52,7 +51,6 @@ func DisableFastStartup() (string, error) {
 		return "Fast startup is only applicable on Windows.", nil
 	}
 
-	// 1. Direct execution attempt (succeeds if running as Administrator)
 	cmd := exec.Command("powercfg", "-h", "off")
 	cmd.SysProcAttr = hideWindowAttr()
 	_, err := cmd.CombinedOutput()
@@ -65,7 +63,7 @@ func DisableFastStartup() (string, error) {
 		}
 	}
 
-	// 2. Request UAC elevation via PowerShell Start-Process -Verb RunAs
+	// Fallback to elevated prompt if needed
 	psScript := `Start-Process powershell.exe -ArgumentList "-NoProfile -Command powercfg -h off; Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -Name HiberbootEnabled -Value 0 -Type DWord" -Verb RunAs -WindowStyle Hidden -Wait`
 	elevCmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", psScript)
 	elevCmd.SysProcAttr = hideWindowAttr()
@@ -94,7 +92,6 @@ func EnableFastStartup() (string, error) {
 		return "Fast startup is only applicable on Windows.", nil
 	}
 
-	// 1. Direct execution attempt
 	cmd := exec.Command("powercfg", "-h", "on")
 	cmd.SysProcAttr = hideWindowAttr()
 	_, err := cmd.CombinedOutput()
@@ -107,7 +104,7 @@ func EnableFastStartup() (string, error) {
 		}
 	}
 
-	// 2. Request UAC elevation via PowerShell Start-Process -Verb RunAs
+	// Fallback to elevated prompt if needed
 	psScript := `Start-Process powershell.exe -ArgumentList "-NoProfile -Command powercfg -h on; Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -Name HiberbootEnabled -Value 1 -Type DWord" -Verb RunAs -WindowStyle Hidden -Wait`
 	elevCmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", psScript)
 	elevCmd.SysProcAttr = hideWindowAttr()
@@ -128,8 +125,6 @@ func EnableFastStartup() (string, error) {
 }
 
 func checkWindowsBitLocker() (bool, string) {
-	// Use manage-bde with a strict 1-second timeout and hidden window.
-	// Avoid PowerShell to prevent console window flashing.
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 

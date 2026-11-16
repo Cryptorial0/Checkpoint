@@ -87,7 +87,7 @@ func TestRestoreGameConflictResolution(t *testing.T) {
 		BackupDate:         "2026-10-20T12:00:00Z",
 	}
 
-	// 1. Conflict Resolution: "skip" should preserve existing files untouched
+	// Conflict Resolution: "skip" should preserve existing files untouched
 	report := RestoreGame(tempDir, meta, targetDir, "skip")
 	if !report.Success || !report.Skipped {
 		t.Errorf("Expected report to succeed with Skipped=true, got %+v", report)
@@ -97,7 +97,7 @@ func TestRestoreGameConflictResolution(t *testing.T) {
 		t.Errorf("Expected local save to remain untouched on skip, got: %s", string(data))
 	}
 
-	// 2. Conflict Resolution: "backup_local" should create a safety backup before continuing
+	// Conflict Resolution: "backup_local" should create a safety backup before continuing
 	_ = RestoreGame(tempDir, meta, targetDir, "backup_local")
 	// Verify that a backup directory was created
 	entries, _ := os.ReadDir(tempDir)

@@ -2,6 +2,9 @@
 
 package main
 
+// Direct Win32 message loop and controls via syscall.NewLazyDLL
+// for CGO_ENABLED=0 cross-compilation from Linux CI without MinGW.
+
 import (
 	"fmt"
 	"path/filepath"
@@ -61,7 +64,6 @@ const (
 
 	COLOR_BTNFACE = 15
 
-	// Control IDs
 	ID_BTN_SCAN     = 1001
 	ID_BTN_BACKUP   = 1002
 	ID_BTN_BROWSE_S = 1003
@@ -221,27 +223,22 @@ func createChildControls(parent, hInstance uintptr) {
 		return hCtrl
 	}
 
-	// 1. Banner & Web UI Link
 	makeControl(staticClass, "Checkpoint: Game Save Backup & Restore (v"+AppVersion+")", 0, 20, 15, 450, 20, 0)
 	hBtnOpenWeb = makeControl(btnClass, "Open Web Dashboard", BS_PUSHBUTTON|WS_TABSTOP, 480, 12, 330, 26, ID_BTN_OPEN_WEB)
 
-	// 2. System Safety Group
 	makeControl(staticClass, "System & Drive Safety:", 0, 20, 48, 200, 20, 0)
 	hLblFastboot = makeControl(staticClass, "Checking Fast Startup...", 0, 20, 71, 420, 20, 0)
 	hBtnFastboot = makeControl(btnClass, "Disable Fast Startup", BS_PUSHBUTTON|WS_TABSTOP, 460, 68, 160, 26, ID_BTN_FASTBOOT)
 	hBtnUndoBoot = makeControl(btnClass, "Undo / Re-enable", BS_PUSHBUTTON|WS_TABSTOP, 630, 68, 140, 26, ID_BTN_UNDOBOOT)
 
-	// 3. Scan Settings
 	makeControl(staticClass, "Custom Scan Path (Optional, e.g. D:\\Games):", 0, 20, 105, 300, 20, 0)
 	hEdtScan = makeControl(editClass, "", WS_BORDER|ES_AUTOHSCROLL|WS_TABSTOP, 20, 128, 540, 26, ID_EDT_SCAN)
 	hBtnBrowseS = makeControl(btnClass, "Browse...", BS_PUSHBUTTON|WS_TABSTOP, 570, 128, 90, 26, ID_BTN_BROWSE_S)
 	hBtnScan = makeControl(btnClass, "Scan Games", BS_PUSHBUTTON|WS_TABSTOP, 670, 128, 120, 26, ID_BTN_SCAN)
 
-	// 4. Detected Games List
 	makeControl(staticClass, "Detected Saves (Emulators, In-Tree & Non-Cloud Titles):", 0, 20, 168, 500, 20, 0)
 	hLstGames = makeControl(listClass, "", WS_BORDER|WS_VSCROLL|LBS_NOTIFY|WS_TABSTOP, 20, 192, 770, 240, ID_LST_GAMES)
 
-	// 5. Destination & Action
 	makeControl(staticClass, "Backup Destination Folder (e.g. USB Flash Drive E:\\):", 0, 20, 450, 400, 20, 0)
 	hEdtDest = makeControl(editClass, "", WS_BORDER|ES_AUTOHSCROLL|WS_TABSTOP, 20, 472, 650, 26, ID_EDT_DEST)
 	hBtnBrowseD = makeControl(btnClass, "Browse...", BS_PUSHBUTTON|WS_TABSTOP, 680, 472, 110, 26, ID_BTN_BROWSE_D)

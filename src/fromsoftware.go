@@ -22,7 +22,6 @@ func PatchEldenRingSave(filePath string, oldSteamID, newSteamID uint64) error {
 	binary.LittleEndian.PutUint64(oldBytes[:], oldSteamID)
 	binary.LittleEndian.PutUint64(newBytes[:], newSteamID)
 
-	// Replace all instances of old SteamID in the save file
 	replacedCount := 0
 	for {
 		idx := bytes.Index(data, oldBytes[:])
@@ -58,7 +57,6 @@ func PatchEldenRingSave(filePath string, oldSteamID, newSteamID uint64) error {
 		copy(data[curCs:curCs+16], hash[:])
 	}
 
-	// Write patched save back to disk
 	if err := os.WriteFile(filePath, data, 0666); err != nil {
 		return fmt.Errorf("failed to write patched save: %w", err)
 	}

@@ -2,6 +2,9 @@
 
 package main
 
+// Direct Win32 dialog bindings via syscall.NewLazyDLL to allow
+// CGO_ENABLED=0 cross-compilation from Linux CI without MinGW.
+
 import (
 	"fmt"
 	"os"
@@ -67,7 +70,7 @@ func openFolderPickerOS(title string) (string, error) {
 
 	pidl, _, _ := procSHBrowseForFolderW.Call(uintptr(unsafe.Pointer(&bi)))
 	if pidl == 0 {
-		return "", nil // Cancelled
+		return "", nil
 	}
 	defer procCoTaskMemFree.Call(pidl)
 
@@ -93,14 +96,13 @@ func openFilePickerOS(title, filter string) (string, error) {
 
 	ret, _, _ := procGetOpenFileNameW.Call(uintptr(unsafe.Pointer(&ofn)))
 	if ret == 0 {
-		return "", nil // Cancelled
+		return "", nil
 	}
 	return syscall.UTF16ToString(buf), nil
 }
 
 func getAvailableDrivesOS() []DriveInfo {
 	var drives []DriveInfo
-	// Instant filesystem scan of drive letters - zero subprocesses, zero powershell
 	for r := 'C'; r <= 'Z'; r++ {
 		p := string(r) + ":\\"
 		if fi, err := os.Stat(p); err == nil && fi.IsDir() {

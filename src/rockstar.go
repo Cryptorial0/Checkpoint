@@ -71,18 +71,16 @@ func HandleRockstarGamesAlignment(targetDir, appID string) {
 		profileIDs = append(profileIDs, sp)
 	}
 
-	// 1. Sync across all existing profile directories in targetDir/Profiles
 	profilesDir := filepath.Join(targetDir, "Profiles")
 	if _, err := os.Stat(profilesDir); err == nil {
 		syncToProfilesFolder(profilesDir, saveFiles, profileIDs)
 	}
 
-	// If not inside a Wine prefix, we're done with local profiles sync
 	if driveC == "" {
 		return
 	}
 
-	// 2. Multi-destination seeding across all user directories in drive_c/users
+	// Seeding across user directories in drive_c/users
 	userDirs := getPrefixUserDirs(driveC)
 	for _, uDir := range userDirs {
 		if isRDR2 {

@@ -23,80 +23,18 @@ window.addEventListener("focus", () => {
   document.title = originalTitle;
 });
 
-// Windows 7 Audio Synthesis
+// Sound alerts
+const notifyAudio = new Audio("notify.ogg");
+const completeAudio = new Audio("complete.ogg");
+
 function playWin7Notify() {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    if (ctx.state === "suspended") ctx.resume();
-    const now = ctx.currentTime;
-
-    // Windows 7 Notify: Two warm bell harmonics
-    // Tone 1: E5 (659.25 Hz)
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = "sine";
-    osc1.frequency.setValueAtTime(659.25, now);
-    gain1.gain.setValueAtTime(0.001, now);
-    gain1.gain.exponentialRampToValueAtTime(0.24, now + 0.015);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.25);
-
-    // Tone 2: A5 (880.00 Hz) with soft secondary harmonic
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = "sine";
-    osc2.frequency.setValueAtTime(880.00, now + 0.12);
-    gain2.gain.setValueAtTime(0.001, now + 0.12);
-    gain2.gain.exponentialRampToValueAtTime(0.28, now + 0.135);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.12);
-    osc2.stop(now + 0.48);
-  } catch (e) {
-    // Audio context unavailable
-  }
+  notifyAudio.currentTime = 0;
+  notifyAudio.play().catch(() => {});
 }
 
 function playWin7Tada() {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    if (ctx.state === "suspended") ctx.resume();
-    const now = ctx.currentTime;
-
-    // Windows 7 Tada Fanfare: C4 -> E4 -> G4 -> C5
-    const notes = [
-      { freq: 261.63, start: 0.00, dur: 0.13, gain: 0.20 }, // C4
-      { freq: 329.63, start: 0.11, dur: 0.13, gain: 0.22 }, // E4
-      { freq: 392.00, start: 0.22, dur: 0.16, gain: 0.25 }, // G4
-      { freq: 523.25, start: 0.36, dur: 0.55, gain: 0.30 }, // C5 (held)
-    ];
-
-    notes.forEach(n => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle"; // warm brass/synth timbre
-      osc.frequency.setValueAtTime(n.freq, now + n.start);
-
-      gain.gain.setValueAtTime(0.001, now + n.start);
-      gain.gain.exponentialRampToValueAtTime(n.gain, now + n.start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + n.start + n.dur);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + n.start);
-      osc.stop(now + n.start + n.dur + 0.05);
-    });
-  } catch (e) {
-    // Audio context unavailable
-  }
+  completeAudio.currentTime = 0;
+  completeAudio.play().catch(() => {});
 }
 
 function log(msg) {

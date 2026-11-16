@@ -14,11 +14,9 @@ static void on_destroy(GtkWidget* widget, gpointer data) {
 }
 
 static int run_gtk_webview(const char* title, const char* url, int width, int height, const void* icon_data, int icon_len) {
-    // 1. Wayland requirement: Set program name and application name before gtk_init_check
     g_set_prgname("checkpoint");
     g_set_application_name("Checkpoint");
 
-    // 2. Configure WebKit subprocess paths and sandboxing if running inside AppImage
     const char* appdir = g_getenv("APPDIR");
     if (appdir) {
         char exec_path[1024];
@@ -39,7 +37,6 @@ static int run_gtk_webview(const char* title, const char* url, int width, int he
         return 0;
     }
 
-    // 3. Add AppDir paths to GTK icon search path if running inside an AppImage
     if (appdir) {
         GtkIconTheme *theme = gtk_icon_theme_get_default();
         if (theme) {
@@ -50,7 +47,6 @@ static int run_gtk_webview(const char* title, const char* url, int width, int he
         }
     }
 
-    // 3. Set default icon name for window decorations and Wayland compositors
     gtk_window_set_default_icon_name("checkpoint");
 
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);

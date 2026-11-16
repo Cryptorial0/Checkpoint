@@ -43,25 +43,25 @@ func TestRockstarGamesRDR2Alignment(t *testing.T) {
 	// Run alignment
 	HandleRockstarGamesAlignment(steamuserDocs, "1174180")
 
-	// 1. Verify Goldberg SocialClub Emu received the saves
+	// Verify Goldberg SocialClub Emu received the saves
 	goldbergSave := filepath.Join(goldbergEmuDir, "SRDR30000")
 	if data, err := os.ReadFile(goldbergSave); err != nil || string(data) != string(saveContent) {
 		t.Errorf("Expected Goldberg emu to receive SRDR30000, err: %v", err)
 	}
 
-	// 2. Verify EMPRESS / .1911 received the saves
+	// Verify EMPRESS / .1911 received the saves
 	empressSave := filepath.Join(driveC, "users", "steamuser", "AppData", "Roaming", ".1911", "Red Dead Redemption 2", "profile", "SRDR30000")
 	if data, err := os.ReadFile(empressSave); err != nil || string(data) != string(saveContent) {
 		t.Errorf("Expected EMPRESS /.1911 to receive SRDR30000, err: %v", err)
 	}
 
-	// 3. Verify non-steamuser profile folder received the saves
+	// Verify non-steamuser profile folder received the saves
 	gamerSave := filepath.Join(gamerDocs, "SRDR30000")
 	if data, err := os.ReadFile(gamerSave); err != nil || string(data) != string(saveContent) {
 		t.Errorf("Expected gamer user dir to receive SRDR30000, err: %v", err)
 	}
 
-	// 4. Verify common emulator profile IDs exist under steamuser Documents
+	// Verify common emulator profile IDs exist under steamuser Documents
 	defaultEmuProfileSave := filepath.Join(steamuserDocs, "Profiles", "0F74F4C4", "SRDR30000")
 	if data, err := os.ReadFile(defaultEmuProfileSave); err != nil || string(data) != string(saveContent) {
 		t.Errorf("Expected default emu profile 0F74F4C4 to receive SRDR30000, err: %v", err)

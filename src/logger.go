@@ -16,7 +16,6 @@ var (
 )
 
 func InitLogger() {
-	// 1. Try exe directory
 	exePath, err := os.Executable()
 	var primaryPath string
 	if err == nil {
@@ -33,7 +32,6 @@ func InitLogger() {
 		LogPath = primaryPath
 	}
 
-	// 2. Also write to Temp dir as fallback
 	tempLog := filepath.Join(os.TempDir(), "save_migrator.log")
 	if tempLog != primaryPath {
 		f2, err2 := os.OpenFile(tempLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -60,10 +58,8 @@ func Log(format string, a ...interface{}) {
 	logMu.Lock()
 	defer logMu.Unlock()
 
-	// Print to stdout
 	fmt.Print(line)
 
-	// Write to all active log files
 	for _, f := range logFiles {
 		io.WriteString(f, line)
 		f.Sync()

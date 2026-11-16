@@ -221,9 +221,6 @@ func fetchSteamMetadata(appid string) (string, string) {
 
 		var devs []string
 		devs = append(devs, appData.Data.Developers...)
-		// Only cache actual Developer studios (e.g. "Sandfall Interactive").
-		// Never cache platform Publishers (e.g. "PlayStation Publishing LLC", "Xbox Game Studios")
-		// as they publish hundreds of unrelated titles and cause false positives.
 		if len(devs) > 0 {
 			appDevelopersCacheMu.Lock()
 			appDevelopersCache[appid] = devs
@@ -781,7 +778,6 @@ func findAppIDByMachineCorrelation(folderName string, detectedGames []DetectedGa
 		return ""
 	}
 
-	// 1. Direct title and title token comparison against detected games on machine
 	for _, g := range detectedGames {
 		if g.AppID == "" {
 			continue
@@ -789,12 +785,10 @@ func findAppIDByMachineCorrelation(folderName string, detectedGames []DetectedGa
 		gNameClean := cleanGameTitle(g.Name)
 		gNameLow := strings.ToLower(gNameClean)
 
-		// Exact match after cleaning (e.g. "Silent Hill 2" == "SILENT HILL 2")
 		if fLow == gNameLow {
 			return g.AppID
 		}
 
-		// Title word containment (e.g. "Dawnwalker" in "The Blood of Dawnwalker")
 		if len(fLow) >= 4 {
 			words := strings.Fields(strings.Map(func(r rune) rune {
 				if unicode.IsLetter(r) || unicode.IsDigit(r) {
@@ -809,7 +803,6 @@ func findAppIDByMachineCorrelation(folderName string, detectedGames []DetectedGa
 			}
 		}
 
-		// Collapsed alphanumeric & roman numeral matching (e.g. "kingdomcome2" matches "Kingdom Come: Deliverance II")
 		fKey := normalizeTitleKey(folderName)
 		gKey := normalizeTitleKey(g.Name)
 		if fKey == gKey {
@@ -824,7 +817,6 @@ func findAppIDByMachineCorrelation(folderName string, detectedGames []DetectedGa
 		}
 	}
 
-	// 2. Developer / Studio comparison (e.g. "Sandfall" in "Sandfall Interactive" -> Clair Obscur)
 	appDevelopersCacheMu.RLock()
 	defer appDevelopersCacheMu.RUnlock()
 
@@ -876,7 +868,6 @@ func ResolveGameInfo(term string) GameResolveResult {
 		return GameResolveResult{}
 	}
 
-	// 1. If user typed numeric Steam AppID
 	if _, err := strconv.Atoi(term); err == nil {
 		name := getGameName(term, "")
 		icon := getSteamIconURL(term)
@@ -889,7 +880,6 @@ func ResolveGameInfo(term string) GameResolveResult {
 		}
 	}
 
-	// 2. Resolve title via dynamic Steam Store search
 	appID, icon, tier := resolveAppIDByName(term)
 	name := term
 	if appID != "" {
@@ -1092,7 +1082,6 @@ func getGameName(appid, defaultName string) string {
 		return name
 	}
 
-	// 1. Try reading the game title from a local Steam library appmanifest
 	if localName := findLocalSteamManifestName(appid); localName != "" {
 		appNameCacheMu.Lock()
 		appNameCache[appid] = localName
@@ -1101,7 +1090,6 @@ func getGameName(appid, defaultName string) string {
 		return localName
 	}
 
-	// 2. Fetch from Steam Store API
 	onlineName := fetchSteamNameOnline(appid)
 	if onlineName != "" {
 		appNameCacheMu.Lock()
@@ -1124,7 +1112,6 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 
 	SetProgress("scan", 5, "Scanning Windows Public Documents & offline profiles...", 0, 100, "")
 
-	// 1. Emulator, Profile & Documents Scans
 	scanPublicDocuments(&games, seenPaths)
 	SetProgress("scan", 20, "Scanning user AppData and Saved Games...", 20, 100, "")
 	scanUserAppData(&games, seenPaths)
@@ -1138,7 +1125,6 @@ func ScanInstalledGames(customScanRoots []string) ([]DetectedGame, error) {
 		scanLinuxHostSaves(&games, seenPaths)
 	}
 
-	// 2. In-Tree & Drive-wide Scans (Lies of P, portable emulators, Bloodborne bbport, custom roots)
 	scanRoots := []string{}
 	if runtime.GOOS == "windows" {
 		SetProgress("scan", 60, "Scanning drive roots and installed game directories...", 60, 100, "")
@@ -1987,7 +1973,6 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 
 		gameFolder := filepath.Join(localAppData, name)
 
-		// 1. Standard Unreal Engine SaveGames: <LocalAppData>\<GameName>\Saved\SaveGames
 		saveGamesDir := filepath.Join(gameFolder, "Saved", "SaveGames")
 		if stat, err := os.Stat(saveGamesDir); err == nil && stat.IsDir() {
 			canonical := getCanonicalPath(saveGamesDir)
@@ -1999,7 +1984,6 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 				seen[canonical] = true
 				seen[saveGamesDir] = true
 
-				// Check local ini for AppID / ProjectName
 				iniAppID, iniProject := extractUnrealConfigMeta(gameFolder)
 				appID := iniAppID
 				cleanName := cleanGameTitle(name)
@@ -2007,7 +1991,6 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 					cleanName = cleanGameTitle(iniProject)
 				}
 
-				// Check known project codenames (HighMoon -> Evil West, Pagoda -> Dead as Disco)
 				if appID == "" {
 					cID, cName := resolveUnrealProjectCodename(name)
 					if cID != "" {
@@ -2016,7 +1999,6 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 					}
 				}
 
-				// Check installed Steam games dynamically (e.g. Discovery in THE FINALS, PioneerGame in ARC Raiders)
 				if appID == "" {
 					codeAppID, codeName := findAppIDByInstalledGameFolder(name)
 					if codeAppID != "" {
@@ -2025,7 +2007,6 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 					}
 				}
 
-				// Machine-wide correlation with detected AppIDs (e.g. matching Sandfall -> Clair Obscur, Dawnwalker -> The Blood of Dawnwalker)
 				if appID == "" {
 					matched := findAppIDByMachineCorrelation(name, *games)
 					if matched != "" {
@@ -2069,7 +2050,6 @@ func scanLocalAppDataUnrealGames(localAppData string, games *[]DetectedGame, see
 			continue
 		}
 
-		// 2. Direct Saved folder if it contains saves: <LocalAppData>\<GameName>\Saved
 		savedDir := filepath.Join(gameFolder, "Saved")
 		if stat, err := os.Stat(savedDir); err == nil && stat.IsDir() {
 			if seen[savedDir] {
@@ -2426,7 +2406,6 @@ func parseSFOData(data []byte) SFOInfo {
 		return info
 	}
 
-	// 1. Check standard Sony SFO header: "\x00PSF"
 	if string(data[:4]) == "\x00PSF" {
 		keyTableStart := binary.LittleEndian.Uint32(data[8:12])
 		dataTableStart := binary.LittleEndian.Uint32(data[12:16])
@@ -2479,7 +2458,6 @@ func parseSFOData(data []byte) SFOInfo {
 		}
 	}
 
-	// 2. Fallback heuristic for mock/truncated test SFO files
 	if info.Title == "" {
 		idx := bytes.Index(data, []byte("TITLE\x00"))
 		if idx != -1 {
@@ -3135,7 +3113,6 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 
 		subPath := filepath.Join(docsDir, name)
 
-		// 1. Check "My Games" subfolder (e.g. Skyrim, Fallout, Borderlands, Civ, Outlast, Rocket League)
 		if nameLow == "my games" {
 			mgEntries, err := os.ReadDir(subPath)
 			if err == nil {
@@ -3234,7 +3211,6 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 			continue
 		}
 
-		// 2. Handle publisher subfolders (Rockstar Games, WB Games, Telltale Games, KONAMI, CAPCOM, CD Projekt Red, Respawn)
 		if knownPublisherFolders[nameLow] {
 			pubEntries, err := os.ReadDir(subPath)
 			if err == nil {
@@ -3291,7 +3267,6 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 			continue
 		}
 
-		// 3. Handle CPY_SAVES
 		if nameLow == "cpy_saves" {
 			cpyBase := filepath.Join(subPath, "CPY")
 			if stat, err := os.Stat(cpyBase); err == nil && stat.IsDir() {
@@ -3300,7 +3275,6 @@ func scanSpecificDocsDir(docsDir string, games *[]DetectedGame, seen map[string]
 			continue
 		}
 
-		// 4. Direct game folders in Documents (e.g. Darkest, Witcher 3, TLOU2, Tsushima)
 		canonical := getCanonicalPath(subPath)
 		if seen[canonical] || seen[subPath] {
 			continue
@@ -3688,19 +3662,16 @@ func scanShadPS4Root(shadRoot string, games *[]DetectedGame, seen map[string]boo
 		return
 	}
 
-	// 1. Direct savedata: shadRoot/savedata
 	directSave := filepath.Join(shadRoot, "savedata")
 	if stat, err := os.Stat(directSave); err == nil && stat.IsDir() {
 		scanPS4SaveDir(directSave, shadRoot, games, seen)
 	}
 
-	// 2. User savedata: shadRoot/user/savedata
 	userSave := filepath.Join(shadRoot, "user", "savedata")
 	if stat, err := os.Stat(userSave); err == nil && stat.IsDir() {
 		scanPS4SaveDir(userSave, shadRoot, games, seen)
 	}
 
-	// 3. User home savedata: shadRoot/home/<userID>/savedata (e.g. Sako: home/1000/savedata)
 	homeDir := filepath.Join(shadRoot, "home")
 	if stat, err := os.Stat(homeDir); err == nil && stat.IsDir() {
 		entries, err := os.ReadDir(homeDir)
@@ -4001,7 +3972,6 @@ func scanInTreeDirectory(rootDir string, games *[]DetectedGame, seen map[string]
 		return
 	}
 
-	// 1. Direct check: Is rootDir itself a PS4 / ShadPS4 directory?
 	scanShadPS4Root(rootDir, games, seen)
 	if isCUSAID(filepath.Base(rootDir)) {
 		addPS4Game(rootDir, filepath.Dir(rootDir), filepath.Base(rootDir), games, seen)
@@ -4355,13 +4325,11 @@ func scanCustomPath(customPath string, games *[]DetectedGame, seen map[string]bo
 		return
 	}
 
-	// 0. Direct check: Is this custom path itself a Wine/Proton prefix?
 	if isWinePrefixDir(customPath) {
 		scanWinePrefix(customPath, filepath.Base(customPath), games, seen)
 		return
 	}
 
-	// 0b. Direct check: Does this custom path contain subfolders that are Wine/Proton prefixes?
 	if entries, err := os.ReadDir(customPath); err == nil {
 		foundPrefix := false
 		for _, e := range entries {
@@ -4378,14 +4346,12 @@ func scanCustomPath(customPath string, games *[]DetectedGame, seen map[string]bo
 		}
 	}
 
-	// 1. Direct check: PS4 Emulator savedata (savedata, user/savedata, home/*/savedata)
 	scanShadPS4Root(customPath, games, seen)
 	if isCUSAID(filepath.Base(customPath)) {
 		addPS4Game(customPath, filepath.Dir(customPath), filepath.Base(customPath), games, seen)
 		return
 	}
 
-	// 2. Direct check: Standalone game save folder (e.g. Darkest Dungeon)
 	baseName := filepath.Base(customPath)
 	baseLow := strings.ToLower(baseName)
 	if !ignoredGenericGameFolders[baseLow] && !ignoredGameResourceFolders[baseLow] && !seen[customPath] && hasGameSaveIndicators(customPath) {
@@ -4416,7 +4382,6 @@ func scanCustomPath(customPath string, games *[]DetectedGame, seen map[string]bo
 		}
 	}
 
-	// 3. Container folder scan
 	scanInTreeDirectory(customPath, games, seen)
 }
 
@@ -4630,10 +4595,8 @@ func ScanOnlineGames() []OnlineGame {
 	var results []OnlineGame
 	found := make(map[string]bool)
 
-	// 1. Scan Windows Uninstall Registry (Universal for all launchers & standalone games)
 	scanWindowsRegistryOnlineGames(&results, found)
 
-	// 2. Scan standard directory roots
 	searchRoots := []string{}
 	if runtime.GOOS == "windows" {
 		searchRoots = append(searchRoots,
@@ -4963,7 +4926,6 @@ func scanWinePrefix(prefixRoot string, originAppID string, games *[]DetectedGame
 
 		uPath := filepath.Join(usersDir, uName)
 
-		// 1. AppData Local
 		localApp := filepath.Join(uPath, "AppData", "Local")
 		if stat, err := os.Stat(localApp); err == nil && stat.IsDir() {
 			scanLocalAppDataUnrealGames(localApp, games, seen)
@@ -4971,7 +4933,6 @@ func scanWinePrefix(prefixRoot string, originAppID string, games *[]DetectedGame
 			scanAppIDSubdirs(skidrowBase, "Offline Profile", "users/steamuser/AppData/Local/SKIDROW", games, seen)
 		}
 
-		// 2. AppData Roaming
 		roamingApp := filepath.Join(uPath, "AppData", "Roaming")
 		if stat, err := os.Stat(roamingApp); err == nil && stat.IsDir() {
 			goldbergBase := filepath.Join(roamingApp, "Goldberg SteamEmu Saves")
@@ -5021,13 +4982,11 @@ func scanWinePrefix(prefixRoot string, originAppID string, games *[]DetectedGame
 			}
 		}
 
-		// 3. AppData LocalLow
 		localLow := filepath.Join(uPath, "AppData", "LocalLow")
 		if stat, err := os.Stat(localLow); err == nil && stat.IsDir() {
 			scanUserAppDataLocalLow(localLow, games, seen)
 		}
 
-		// 4. Documents & Saved Games
 		docs := filepath.Join(uPath, "Documents")
 		if stat, err := os.Stat(docs); err == nil && stat.IsDir() {
 			scanSpecificDocsDir(docs, games, seen)
@@ -5111,7 +5070,6 @@ func scanLinuxHostSaves(games *[]DetectedGame, seen map[string]bool) {
 		return
 	}
 
-	// 1. Steam Library Proton Prefixes (compatdata)
 	steamLibs := findSteamLibraryFolders()
 	for _, lib := range steamLibs {
 		compatdataDir := filepath.Join(lib, "steamapps", "compatdata")
@@ -5132,7 +5090,6 @@ func scanLinuxHostSaves(games *[]DetectedGame, seen map[string]bool) {
 		}
 	}
 
-	// 2. Hydra Launcher Prefixes
 	hydraBase := filepath.Join(home, ".config", "hydralauncher", "wine-prefixes")
 	if hEntries, err := os.ReadDir(hydraBase); err == nil {
 		for _, he := range hEntries {
@@ -5143,7 +5100,6 @@ func scanLinuxHostSaves(games *[]DetectedGame, seen map[string]bool) {
 		}
 	}
 
-	// 3. Heroic Games Launcher Prefixes
 	heroicBases := []string{
 		filepath.Join(home, ".config", "heroic", "prefixes"),
 		filepath.Join(home, ".var", "app", "com.heroicgameslauncher.hgl", "config", "heroic", "prefixes"),
@@ -5160,7 +5116,6 @@ func scanLinuxHostSaves(games *[]DetectedGame, seen map[string]bool) {
 		}
 	}
 
-	// 4. Lutris Prefixes
 	lutrisBases := []string{
 		filepath.Join(home, "Games"),
 		filepath.Join(home, "Games", "lutris"),
@@ -5176,15 +5131,11 @@ func scanLinuxHostSaves(games *[]DetectedGame, seen map[string]bool) {
 		}
 	}
 
-	// 5. Console Emulators
 	scanLinuxConsoleEmulators(games, seen)
-
-	// 6. Offline Windows Partitions & NTFS Volumes
 	scanOfflineWindowsPartitions(games, seen)
 }
 
 func scanOfflineWindowsPartitions(games *[]DetectedGame, seen map[string]bool) {
-	// 1. Scan mounted partitions from /proc/mounts
 	mountsFile := "/proc/mounts"
 	data, err := os.ReadFile(mountsFile)
 	if err == nil {
@@ -5207,7 +5158,6 @@ func scanOfflineWindowsPartitions(games *[]DetectedGame, seen map[string]bool) {
 		}
 	}
 
-	// 2. Also check common static mount paths
 	staticCandidates := []string{
 		"/mnt/windows",
 		"/mnt/c",
@@ -5333,7 +5283,6 @@ func ScanWindowsVolume(mountPath string, games *[]DetectedGame, seen map[string]
 
 		uPath := filepath.Join(usersDir, uName)
 
-		// 1. AppData Local
 		localApp := filepath.Join(uPath, "AppData", "Local")
 		if stat, err := os.Stat(localApp); err == nil && stat.IsDir() {
 			scanLocalAppDataUnrealGames(localApp, games, seen)
@@ -5341,7 +5290,6 @@ func ScanWindowsVolume(mountPath string, games *[]DetectedGame, seen map[string]
 			scanAppIDSubdirs(skidrowBase, "Offline Profile", "users/steamuser/AppData/Local/SKIDROW", games, seen)
 		}
 
-		// 2. AppData Roaming
 		roamingApp := filepath.Join(uPath, "AppData", "Roaming")
 		if stat, err := os.Stat(roamingApp); err == nil && stat.IsDir() {
 			goldbergBase := filepath.Join(roamingApp, "Goldberg SteamEmu Saves")
@@ -5391,13 +5339,11 @@ func ScanWindowsVolume(mountPath string, games *[]DetectedGame, seen map[string]
 			}
 		}
 
-		// 3. AppData LocalLow
 		localLow := filepath.Join(uPath, "AppData", "LocalLow")
 		if stat, err := os.Stat(localLow); err == nil && stat.IsDir() {
 			scanUserAppDataLocalLow(localLow, games, seen)
 		}
 
-		// 4. Documents & Saved Games
 		docs := filepath.Join(uPath, "Documents")
 		if stat, err := os.Stat(docs); err == nil && stat.IsDir() {
 			scanSpecificDocsDir(docs, games, seen)
@@ -5408,7 +5354,6 @@ func ScanWindowsVolume(mountPath string, games *[]DetectedGame, seen map[string]
 		}
 	}
 
-	// 5. ProgramData
 	progData := filepath.Join(mountPath, "ProgramData")
 	if stat, err := os.Stat(progData); err == nil && stat.IsDir() {
 		scanAppIDSubdirs(filepath.Join(progData, "Steam"), "Offline Profile", "ProgramData/Steam", games, seen)

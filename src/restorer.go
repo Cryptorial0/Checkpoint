@@ -190,7 +190,6 @@ func enrichManifest(manifest *VaultManifest) {
 func computeAllLauncherTargets(g *GameSaveMeta) {
 	relPath := g.TargetRelativePath
 
-	// 1. Hydra Launcher (Uses SteamID / AppID)
 	if g.AppID != "" {
 		if hydraC := LocateHydraPrefix(g.AppID); hydraC != "" {
 			g.LauncherPaths["hydra"] = resolveCaseInsensitivePath(hydraC, relPath)
@@ -201,7 +200,6 @@ func computeAllLauncherTargets(g *GameSaveMeta) {
 		}
 	}
 
-	// 2. Heroic Games Launcher (Uses custom name / title)
 	if heroicC := LocateHeroicPrefix(g.GameName, g.AppID); heroicC != "" {
 		g.LauncherPaths["heroic"] = resolveCaseInsensitivePath(heroicC, relPath)
 		g.LauncherStatuses["heroic"] = "heroic_detected"
@@ -210,7 +208,6 @@ func computeAllLauncherTargets(g *GameSaveMeta) {
 		g.LauncherStatuses["heroic"] = "not_initialized"
 	}
 
-	// 3. Lutris (Uses game name / slug)
 	if lutrisC := LocateLutrisPrefix(g.GameName, g.AppID); lutrisC != "" {
 		g.LauncherPaths["lutris"] = resolveCaseInsensitivePath(lutrisC, relPath)
 		g.LauncherStatuses["lutris"] = "lutris_detected"
@@ -219,7 +216,6 @@ func computeAllLauncherTargets(g *GameSaveMeta) {
 		g.LauncherStatuses["lutris"] = "not_initialized"
 	}
 
-	// 4. Steam Proton (Optional fallback or for non-Steam added games)
 	if g.AppID != "" {
 		if steamC := LocateProtonPrefix(g.AppID); steamC != "" {
 			g.LauncherPaths["steam"] = resolveCaseInsensitivePath(steamC, relPath)
@@ -639,7 +635,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		label string
 	}
 
-	// 1. PlayStation 4 (ShadPS4 / bbport)
 	if strings.Contains(cLow, "ps4") || strings.HasPrefix(idLow, "ps4_") {
 		var cands []candidate
 		for _, ed := range emuDeckRoots {
@@ -660,7 +655,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 2. Wii U (Cemu)
 	if strings.Contains(cLow, "cemu") || strings.HasPrefix(idLow, "cemu_") || strings.Contains(cLow, "wii u") || strings.Contains(cLow, "wiiu") {
 		var cands []candidate
 		for _, ed := range emuDeckRoots {
@@ -688,7 +682,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 3. PlayStation 3 (RPCS3)
 	if strings.Contains(cLow, "rpcs3") || strings.HasPrefix(idLow, "rpcs3_") {
 		var cands []candidate
 		for _, ed := range emuDeckRoots {
@@ -706,7 +699,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 4. PlayStation 2 (PCSX2)
 	if strings.Contains(cLow, "pcsx2") || strings.HasPrefix(idLow, "pcsx2_") {
 		var cands []candidate
 		for _, ed := range emuDeckRoots {
@@ -724,7 +716,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 5. Nintendo Switch (Ryujinx, Yuzu, Suyu, Eden, Sudachi, Torzu, Citron)
 	if strings.Contains(cLow, "switch") || strings.Contains(cLow, "ryujinx") || strings.Contains(cLow, "yuzu") || strings.Contains(cLow, "suyu") || strings.Contains(cLow, "eden") || strings.Contains(cLow, "sudachi") || strings.HasPrefix(idLow, "emu_") || strings.HasPrefix(idLow, "switch_") {
 		cands := []candidate{
 			{filepath.Join(emuDeckSaves, "ryujinx"), "EmuDeck (Ryujinx)"},
@@ -747,7 +738,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 6. PlayStation 1 (DuckStation)
 	if strings.Contains(cLow, "duckstation") || strings.HasPrefix(idLow, "duckstation_") {
 		cands := []candidate{
 			{filepath.Join(emuDeckSaves, "duckstation"), "EmuDeck (DuckStation)"},
@@ -762,7 +752,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 7. GameCube & Wii (Dolphin)
 	if strings.Contains(cLow, "dolphin") || strings.Contains(cLow, "wii/gc") || strings.HasPrefix(idLow, "emu_dolphin") {
 		cands := []candidate{
 			{filepath.Join(emuDeckSaves, "dolphin"), "EmuDeck (Dolphin)"},
@@ -777,7 +766,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 8. Nintendo 3DS (Citra)
 	if strings.Contains(cLow, "citra") || strings.Contains(cLow, "3ds") || strings.HasPrefix(idLow, "emu_citra") {
 		cands := []candidate{
 			{filepath.Join(emuDeckSaves, "citra"), "EmuDeck (Citra)"},
@@ -791,7 +779,6 @@ func LocateConsoleEmulatorPath(meta GameSaveMeta) (string, string) {
 		}
 	}
 
-	// 9. Xbox 360 (Xenia)
 	if strings.Contains(cLow, "xenia") || strings.Contains(cLow, "xbox 360") || strings.HasPrefix(idLow, "emu_xenia") {
 		cands := []candidate{
 			{filepath.Join(emuDeckSaves, "xenia"), "EmuDeck (Xenia)"},
@@ -972,13 +959,6 @@ func AutoLocateWindowsTarget(meta GameSaveMeta) (string, string, string) {
 	return targetPath, "windows_ready", fmt.Sprintf("Ready to Restore (%s)", desc)
 }
 
-// AutoLocateLinuxTarget resolves target paths with strict priority order for offline games:
-// 1. Console Emulators (if emulator save)
-// 2. Hydra Launcher (uses AppID / SteamID)
-// 3. Heroic Games Launcher (uses custom game name / title)
-// 4. Lutris (uses game slug / name)
-// 5. Native In-Tree game directories
-// 6. Default fallback to Hydra if uninitialized
 func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 	cfg := LoadConfig()
 	if loc, found := cfg.GetLocation(meta.ID, meta.AppID, meta.GameName); found && loc.LinuxResolvedPath != "" {
@@ -992,7 +972,6 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 		return "", "manual", "No HOME environment", "manual"
 	}
 
-	// 1. Console Emulators
 	if emuRoot, emuLabel := LocateConsoleEmulatorPath(meta); emuRoot != "" {
 		relPath := meta.TargetRelativePath
 		cleanRel := filepath.ToSlash(relPath)
@@ -1013,7 +992,6 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 		return target, "emulator_detected", emuLabel, "emulator"
 	}
 
-	// 2. In-Tree native Linux game installation folders
 	cleanName := strings.TrimSpace(meta.GameName)
 	if meta.SaveType == SaveTypeInTree && cleanName != "" {
 		gameCands := []string{
@@ -1112,7 +1090,6 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 	// 3rd: Lutris
 	// ==========================================
 
-	// Check if Hydra prefix is already on disk
 	if meta.AppID != "" {
 		if hydraC := LocateHydraPrefix(meta.AppID); hydraC != "" {
 			target := resolveCaseInsensitivePath(hydraC, meta.TargetRelativePath)
@@ -1120,7 +1097,6 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 		}
 	}
 
-	// Check if Heroic prefix is on disk
 	if cleanName != "" {
 		if heroicC := LocateHeroicPrefix(cleanName, meta.AppID); heroicC != "" {
 			target := resolveCaseInsensitivePath(heroicC, meta.TargetRelativePath)
@@ -1128,7 +1104,6 @@ func AutoLocateLinuxTarget(meta GameSaveMeta) (string, string, string, string) {
 		}
 	}
 
-	// Check if Lutris prefix is on disk
 	if cleanName != "" {
 		if lutrisC := LocateLutrisPrefix(cleanName, meta.AppID); lutrisC != "" {
 			target := resolveCaseInsensitivePath(lutrisC, meta.TargetRelativePath)

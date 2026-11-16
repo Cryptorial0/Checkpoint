@@ -397,12 +397,11 @@ func replaceExecutable(tempPath, targetPath string) error {
 	}
 
 	// On Linux / POSIX:
-	// 1. Try atomic rename first (instant if on the same filesystem)
 	if err := os.Rename(tempPath, targetPath); err == nil {
 		return nil
 	}
 
-	// 2. If atomic rename failed (e.g. EXDEV across filesystems), copy to target.
+	// Fallback to copy across filesystems.
 	// Unlink target first so open running process does not trigger ETXTBSY.
 	backupPath := targetPath + ".old"
 	_ = os.Remove(backupPath)

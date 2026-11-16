@@ -18,7 +18,7 @@ func TestScanBloodborneAndDarkestDungeon(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// 1. Setup Bloodborne structure (ShadPS4 / bbport)
+	// Setup Bloodborne structure (ShadPS4 / bbport)
 	bbSaveDir := filepath.Join(tmpDir, "Bloodborne", "bbport-windows", "user", "savedata", "1", "CUSA00207")
 	if err := os.MkdirAll(bbSaveDir, 0755); err != nil {
 		t.Fatalf("Failed to create bb save dir: %v", err)
@@ -32,14 +32,14 @@ func TestScanBloodborneAndDarkestDungeon(t *testing.T) {
 	}
 	os.WriteFile(filepath.Join(bbCacheDir, "shader_01.spv"), []byte("SPV_VULKAN_SHADER_CACHE"), 0644)
 
-	// 2. Setup God of War III Remastered structure (CUSA01715)
+	// Setup God of War III Remastered structure (CUSA01715)
 	gowSaveDir := filepath.Join(tmpDir, "God of War III Remastered", "gow3-windows", "user", "savedata", "1", "CUSA01715")
 	if err := os.MkdirAll(gowSaveDir, 0755); err != nil {
 		t.Fatalf("Failed to create gow save dir: %v", err)
 	}
 	os.WriteFile(filepath.Join(gowSaveDir, "GOW3_SAVE"), []byte("GOW_SAVE_DATA"), 0644)
 
-	// 3. Setup Darkest Dungeon Documents structure
+	// Setup Darkest Dungeon Documents structure
 	darkestDir := filepath.Join(tmpDir, "Darkest")
 	if err := os.MkdirAll(darkestDir, 0755); err != nil {
 		t.Fatalf("Failed to create darkest dir: %v", err)
@@ -47,7 +47,7 @@ func TestScanBloodborneAndDarkestDungeon(t *testing.T) {
 	os.WriteFile(filepath.Join(darkestDir, "profile_1.json"), []byte("{}"), 0644)
 	os.WriteFile(filepath.Join(darkestDir, "persist.game.json"), []byte("{}"), 0644)
 
-	// 4. Setup False Positive Repack & Program Files folders
+	// Setup False Positive Repack & Program Files folders
 	repackDir := filepath.Join(tmpDir, "Bloodborne [FitGirl Repack]")
 	os.MkdirAll(repackDir, 0755)
 	os.WriteFile(filepath.Join(repackDir, "setup.exe"), []byte("MZ"), 0755)
@@ -166,28 +166,28 @@ func TestInspectRealBundle(t *testing.T) {
 }
 
 func TestResolveGameInfo(t *testing.T) {
-	// 1. Numeric Steam AppID lookup
+	// Numeric Steam AppID lookup
 	res := ResolveGameInfo("292030")
 	if res.AppID != "292030" {
 		t.Errorf("Expected AppID 292030, got %s", res.AppID)
 	}
 	t.Logf("Resolved AppID 292030: Name=%s, Icon=%s, Tier=%s", res.Name, res.IconURL, res.ProtonTier)
 
-	// 2. Title search
+	// Title search
 	res2 := ResolveGameInfo("Dark Souls III")
 	t.Logf("Resolved Dark Souls III: AppID=%s, Name=%s, Icon=%s, Tier=%s", res2.AppID, res2.Name, res2.IconURL, res2.ProtonTier)
 	if res2.AppID == "" {
 		t.Errorf("Expected non-empty AppID for Dark Souls III")
 	}
 
-	// 3. Delisted game fallback (Rocket League)
+	// Delisted game fallback (Rocket League)
 	res3 := ResolveGameInfo("Rocket League")
 	if res3.AppID != "252950" {
 		t.Errorf("Expected AppID 252950 for Rocket League, got %s", res3.AppID)
 	}
 	t.Logf("Resolved Rocket League: AppID=%s, Name=%s", res3.AppID, res3.Name)
 
-	// 4. CamelCase / PascalCase title splitting (FasterThanLight)
+	// CamelCase / PascalCase title splitting (FasterThanLight)
 	res4 := ResolveGameInfo("FasterThanLight")
 	if res4.AppID != "212680" {
 		t.Errorf("Expected AppID 212680 for FasterThanLight, got %s", res4.AppID)
@@ -231,7 +231,7 @@ func TestScanTekken8(t *testing.T) {
 }
 
 func TestStudioCorrelationAndStrictMatching(t *testing.T) {
-	// 1. Verify strict search does NOT falsely match DLC packs for generic names
+	// Verify strict search does NOT falsely match DLC packs for generic names
 	resDisc, _, _ := resolveAppIDByName("Discovery")
 	if resDisc == "1200349" { // Fishing Planet DLC pack
 		t.Errorf("Discovery falsely matched Fishing Planet DLC: %s", resDisc)
@@ -244,7 +244,7 @@ func TestStudioCorrelationAndStrictMatching(t *testing.T) {
 	}
 	t.Logf("PioneerGame strict resolution: AppID=%s (expected empty)", resPioneer)
 
-	// 2. Machine correlation: Pre-populate developer cache with AppID 1903340
+	// Machine correlation: Pre-populate developer cache with AppID 1903340
 	fetchSteamMetadata("1903340") // Clair Obscur: Expedition 33 (Sandfall Interactive)
 	matched := findAppIDByDeveloperOrStudio("Sandfall", []string{"1903340"})
 	if matched != "1903340" {
@@ -253,7 +253,7 @@ func TestStudioCorrelationAndStrictMatching(t *testing.T) {
 		t.Logf("Successfully correlated studio folder 'Sandfall' to AppID 1903340 (%s)", getGameName(matched, ""))
 	}
 
-	// 3. Machine title correlation without hardcoding:
+	// Machine title correlation without hardcoding:
 	// Dawnwalker matches The Blood of Dawnwalker (AppID 3751260)
 	detectedGames := []DetectedGame{
 		{AppID: "3751260", Name: "The Blood of Dawnwalker"},
@@ -280,7 +280,7 @@ func TestStudioCorrelationAndStrictMatching(t *testing.T) {
 		t.Logf("Successfully correlated 'SilentHill2' to AppID 2124490 (%s)", getGameName(matchedSH2, ""))
 	}
 
-	// 4. Test FalloutNV acronym resolution (AppID 22380)
+	// Test FalloutNV acronym resolution (AppID 22380)
 	resFallout, _, _ := resolveAppIDByName("FalloutNV")
 	if resFallout != "22380" {
 		t.Errorf("Expected FalloutNV to resolve to 22380, got %s", resFallout)
@@ -288,7 +288,7 @@ func TestStudioCorrelationAndStrictMatching(t *testing.T) {
 		t.Logf("Successfully resolved FalloutNV to AppID 22380 (%s)", getGameName(resFallout, ""))
 	}
 
-	// 5. Test kingdomcome2 collapsed space & numeral matching (AppID 1771300)
+	// Test kingdomcome2 collapsed space & numeral matching (AppID 1771300)
 	detectedGamesWithKCD := append(detectedGames, DetectedGame{AppID: "1771300", Name: "Kingdom Come: Deliverance II"})
 	matchedKCD := findAppIDByMachineCorrelation("kingdomcome2", detectedGamesWithKCD)
 	if matchedKCD != "1771300" {
@@ -396,34 +396,34 @@ func TestAllConsoleEmulators(t *testing.T) {
 	appData := filepath.Join(tmpDir, "AppData", "Roaming")
 	localAppData := filepath.Join(tmpDir, "AppData", "Local")
 
-	// 1. RPCS3 (PS3)
+	// RPCS3 (PS3)
 	rpcs3Game := filepath.Join(appData, "RPCS3", "dev_hdd0", "home", "00000001", "savedata", "BLUS30109")
 	os.MkdirAll(rpcs3Game, 0755)
 	os.WriteFile(filepath.Join(rpcs3Game, "PARAM.SFO"), []byte("...TITLE\x00Demon's Souls\x00..."), 0644)
 	os.WriteFile(filepath.Join(rpcs3Game, "SYS-DATA"), []byte("savedata_bytes"), 0644)
 
-	// 2. Ryujinx (Switch)
+	// Ryujinx (Switch)
 	ryuSave := filepath.Join(appData, "Ryujinx", "bis", "user", "save", "0000000000000001")
 	os.MkdirAll(ryuSave, 0755)
 	os.WriteFile(filepath.Join(ryuSave, "main"), []byte("switch_save_data"), 0644)
 
-	// 3. Yuzu (Switch)
+	// Yuzu (Switch)
 	yuzuSave := filepath.Join(appData, "yuzu", "nand", "user", "save", "0000000000000000", "0100000000010000")
 	os.MkdirAll(yuzuSave, 0755)
 	os.WriteFile(filepath.Join(yuzuSave, "save.bin"), []byte("yuzu_save_data"), 0644)
 
-	// 4. Citra (3DS)
+	// Citra (3DS)
 	citraSave := filepath.Join(appData, "Citra", "sdmc", "Nintendo 3DS")
 	os.MkdirAll(citraSave, 0755)
 	os.WriteFile(filepath.Join(citraSave, "title.db"), []byte("citra_3ds_save"), 0644)
 
-	// 5. Cemu (Wii U)
+	// Cemu (Wii U)
 	os.Setenv("LOCALAPPDATA", localAppData)
 	cemuSave := filepath.Join(localAppData, "Cemu", "mlc01", "usr", "save", "00050000")
 	os.MkdirAll(cemuSave, 0755)
 	os.WriteFile(filepath.Join(cemuSave, "user.dat"), []byte("cemu_wiiu_save"), 0644)
 
-	// 6. Documents Emulators (PCSX2, Dolphin, Xenia, DuckStation)
+	// Documents Emulators (PCSX2, Dolphin, Xenia, DuckStation)
 	docsDir := filepath.Join(tmpDir, "Documents")
 	os.Setenv("USERPROFILE", tmpDir)
 
@@ -507,7 +507,7 @@ Breath of the Wild</longname_en>
 }
 
 func TestOnlineGamesAndRustFalsePositive(t *testing.T) {
-	// 1. Verify word boundary matching prevents false positives like "Elytra Trusted Certs"
+	// Verify word boundary matching prevents false positives like "Elytra Trusted Certs"
 	if matchesSignatureWord("Elytra Trusted Certs", "Rust") {
 		t.Errorf("matchesSignatureWord matched 'Rust' inside 'Elytra Trusted Certs'!")
 	}
@@ -518,7 +518,7 @@ func TestOnlineGamesAndRustFalsePositive(t *testing.T) {
 		t.Errorf("matchesSignatureWord failed to match 'Rust' in 'Rust Client (x64)'")
 	}
 
-	// 2. Verify Rust anti-cheat status is Broken (EAC official servers kick Linux players)
+	// Verify Rust anti-cheat status is Broken (EAC official servers kick Linux players)
 	var rustFound bool
 	for _, g := range knownOnlineGames {
 		if g.Name == "Rust" {
@@ -533,7 +533,7 @@ func TestOnlineGamesAndRustFalsePositive(t *testing.T) {
 		t.Errorf("Rust not found in knownOnlineGames")
 	}
 
-	// 3. Verify online live-service game filtering
+	// Verify online live-service game filtering
 	if !isOnlineLiveServiceGame("THE FINALS", "2073850", `C:\Users\Mmdxd\AppData\Local\Discovery\Saved\SaveGames`) {
 		t.Errorf("isOnlineLiveServiceGame failed to identify THE FINALS")
 	}
@@ -553,7 +553,7 @@ func TestOnlineGamesAndRustFalsePositive(t *testing.T) {
 		t.Errorf("isOnlineLiveServiceGame incorrectly flagged offline game Elden Ring as online")
 	}
 
-	// 4. Verify Roblox is marked Running via Sober
+	// Verify Roblox is marked Running via Sober
 	var robloxFound bool
 	for _, g := range knownOnlineGames {
 		if g.Name == "Roblox" {
@@ -576,7 +576,7 @@ func TestLocalizedDocumentsAndLocalLow(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// 1. Mock Localized Arabic Documents under OneDrive
+	// Mock Localized Arabic Documents under OneDrive
 	arabicDocs := filepath.Join(tmpDir, "OneDrive", "المستندات")
 	tsushimaSave := filepath.Join(arabicDocs, "Ghost of Tsushima DIRECTOR'S CUT", "76561197960271872")
 	tlou2Save := filepath.Join(arabicDocs, "The Last of Us Part II", "76561197960271872", "savedata")
@@ -609,7 +609,7 @@ func TestLocalizedDocumentsAndLocalLow(t *testing.T) {
 		t.Errorf("Expected at least 4 games detected in localized documents, got %d", len(docGames))
 	}
 
-	// 2. Mock Unity LocalLow
+	// Mock Unity LocalLow
 	localLow := filepath.Join(tmpDir, "AppData", "LocalLow")
 	rubberBandits := filepath.Join(localLow, "Flashbulb", "Rubber Bandits", "76561198370249745", "Synced")
 	ror2 := filepath.Join(localLow, "Hopoo Games, LLC", "Risk of Rain 2")
@@ -647,14 +647,14 @@ func TestSakoEdenAndShadPS4(t *testing.T) {
 	// Mock Sako's AppData/Roaming structure
 	appData := filepath.Join(tmpDir, "AppData", "Roaming")
 
-	// 1. Sako's Eden path: AppData/Roaming/eden/nand/user/save
+	// Sako's Eden path: AppData/Roaming/eden/nand/user/save
 	edenSaveDir := filepath.Join(appData, "eden", "nand", "user", "save", "0000000000000000", "6BC8AB52B3E88CC597064CE5B8704CED", "010019A01E2F2000")
 	if err := os.MkdirAll(edenSaveDir, 0755); err != nil {
 		t.Fatalf("Failed to create eden dir: %v", err)
 	}
 	os.WriteFile(filepath.Join(edenSaveDir, "save.bin"), []byte("SWITCH_SAVE_DATA"), 0644)
 
-	// 2. Sako's ShadPS4 path: AppData/Roaming/shadPS4/home/1000/savedata/CUSA00900/SPRJ0005/sce_sys
+	// Sako's ShadPS4 path: AppData/Roaming/shadPS4/home/1000/savedata/CUSA00900/SPRJ0005/sce_sys
 	bbDir := filepath.Join(appData, "shadPS4", "home", "1000", "savedata", "CUSA00900", "SPRJ0005", "sce_sys")
 	if err := os.MkdirAll(bbDir, 0755); err != nil {
 		t.Fatalf("Failed to create shadPS4 bb dir: %v", err)
@@ -697,7 +697,7 @@ func TestSakoEdenAndShadPS4(t *testing.T) {
 }
 
 func TestTelemetryFindings(t *testing.T) {
-	// 1. Acronym and title expansions
+	// Acronym and title expansions
 	if title := cleanGameTitle("SB"); title != "Stellar Blade" {
 		t.Errorf("Expected SB to expand to 'Stellar Blade', got '%s'", title)
 	}
@@ -711,18 +711,18 @@ func TestTelemetryFindings(t *testing.T) {
 		t.Errorf("Expected Darkest to expand to 'Darkest Dungeon', got '%s'", title)
 	}
 
-	// 2. Unreal Engine project codename for Stellar Blade
+	// Unreal Engine project codename for Stellar Blade
 	appID, gameName := resolveUnrealProjectCodename("SB")
 	if appID != "3489700" || gameName != "Stellar Blade" {
 		t.Errorf("Expected SB codename to resolve to (3489700, Stellar Blade), got (%s, %s)", appID, gameName)
 	}
 
-	// 3. Online live-service check for NIKKE
+	// Online live-service check for NIKKE
 	if !isOnlineLiveServiceGame("NIKKE", "", `C:\Users\test\AppData\LocalLow\com.proximabeta\NIKKE`) {
 		t.Errorf("Expected NIKKE in LocalLow/com.proximabeta to be detected as online live-service game")
 	}
 
-	// 4. Steam Userdata filter verification for 241100, 7, and 760
+	// Steam Userdata filter verification for 241100, 7, and 760
 	testAppIDs := []string{"7", "760", "241100", "1446780"}
 	for _, id := range testAppIDs {
 		isFiltered := (id == "7" || id == "760" || id == "241100")
@@ -736,7 +736,7 @@ func TestTelemetryFindings(t *testing.T) {
 }
 
 func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
-	// 1. Switch Title ID resolution
+	// Switch Title ID resolution
 	if !isSwitchTitleID("010019A01E2F2000") {
 		t.Errorf("Expected 010019A01E2F2000 to be recognized as valid Switch Title ID")
 	}
@@ -747,7 +747,7 @@ func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
 		t.Errorf("Expected Tears of the Kingdom in switchTitleMap")
 	}
 
-	// 2. Binary SFO Parser test
+	// Binary SFO Parser test
 	var sfoBuf bytes.Buffer
 	sfoBuf.WriteString("\x00PSF")
 	binary.Write(&sfoBuf, binary.LittleEndian, uint32(0x00000101))
@@ -777,7 +777,7 @@ func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
 		t.Errorf("Expected parsed SFO Title 'Bloodborne', got '%s'", info.Title)
 	}
 
-	// 3. EmuDeck restorer target resolution
+	// EmuDeck restorer target resolution
 	tmpHome, err := os.MkdirTemp("", "emudeck_home_*")
 	if err != nil {
 		t.Fatalf("Failed to create temp home: %v", err)
@@ -815,7 +815,7 @@ func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
 		t.Errorf("Expected stripped target %s, got %s", expectedTarget, targetPath)
 	}
 
-	// 2. Flatpak Cemu with mlc01/usr/save already created
+	// Flatpak Cemu with mlc01/usr/save already created
 	flatpakCemu := filepath.Join(tmpHome, ".var", "app", "info.cemu.Cemu", "data", "Cemu", "mlc01", "usr", "save")
 	os.MkdirAll(flatpakCemu, 0755)
 	// Remove emuDeck dir to test flatpak detection
@@ -837,7 +837,7 @@ func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
 		t.Errorf("Expected flatpak target %s, got %s", expectedFlatTarget, flatTarget)
 	}
 
-	// 3. Fallback when neither exists on disk yet (must NOT route to Wine/Hydra/Heroic!)
+	// Fallback when neither exists on disk yet (must NOT route to Wine/Hydra/Heroic!)
 	os.RemoveAll(filepath.Join(tmpHome, ".var"))
 	fallbackTarget, fallbackStatus, _, _ := AutoLocateLinuxTarget(cemuMeta)
 	if fallbackStatus != "emulator_detected" {
@@ -847,7 +847,7 @@ func TestEmulationIntelligenceAndEmuDeck(t *testing.T) {
 		t.Errorf("Emulator fallback should never route to Wine prefix: %s", fallbackTarget)
 	}
 
-	// 4. Offline game prefix pre-seeding status check
+	// Offline game prefix pre-seeding status check
 	offlineMeta := GameSaveMeta{
 		ID:                 "offline_game_123",
 		AppID:              "123456",
@@ -901,7 +901,7 @@ func TestWindowsToWindowsRestoration(t *testing.T) {
 	os.MkdirAll(filepath.Join(winUserProfile, "Saved Games"), 0755)
 	os.MkdirAll(filepath.Join(winPublic, "Documents", "Steam", "RUNE"), 0755)
 
-	// 1. AppData/Local (Tekken 8)
+	// AppData/Local (Tekken 8)
 	t8Meta := GameSaveMeta{
 		ID:                 "unreal_tekken_8",
 		GameName:           "TEKKEN 8",
@@ -920,7 +920,7 @@ func TestWindowsToWindowsRestoration(t *testing.T) {
 		t.Errorf("Expected AppData/Local in desc, got %s", t8Desc)
 	}
 
-	// 2. AppData/Roaming (Elden Ring)
+	// AppData/Roaming (Elden Ring)
 	erMeta := GameSaveMeta{
 		ID:                 "fromsoft_eldenring",
 		GameName:           "Elden Ring",
@@ -936,7 +936,7 @@ func TestWindowsToWindowsRestoration(t *testing.T) {
 		t.Errorf("Expected windows_detected, got %s", erStatus)
 	}
 
-	// 3. Documents (Outlast)
+	// Documents (Outlast)
 	olMeta := GameSaveMeta{
 		ID:                 "doc_outlast",
 		GameName:           "Outlast",
@@ -952,7 +952,7 @@ func TestWindowsToWindowsRestoration(t *testing.T) {
 		t.Errorf("Expected windows_ready for uncreated Outlast child folder, got %s", olStatus)
 	}
 
-	// 4. Public Documents (RUNE)
+	// Public Documents (RUNE)
 	runeMeta := GameSaveMeta{
 		ID:                 "profile_123456",
 		GameName:           "RUNE Game",
@@ -965,7 +965,7 @@ func TestWindowsToWindowsRestoration(t *testing.T) {
 		t.Errorf("Expected RUNE target %s, got %s", expectedRune, runeTarget)
 	}
 
-	// 5. Cemu on Windows
+	// Cemu on Windows
 	cemuMeta := GameSaveMeta{
 		ID:                 "cemu_00050000_101c9500",
 		GameName:           "The Legend of Zelda",
@@ -989,13 +989,13 @@ func TestLinuxHostScanner(t *testing.T) {
 	os.Setenv("HOME", tmpLinux)
 	defer os.Setenv("HOME", origHome)
 
-	// 1. Setup a mock Steam Proton compatdata prefix
+	// Setup a mock Steam Proton compatdata prefix
 	protonPfx := filepath.Join(tmpLinux, ".local", "share", "Steam", "steamapps", "compatdata", "1245620", "pfx", "drive_c")
 	erSaveDir := filepath.Join(protonPfx, "users", "steamuser", "AppData", "Roaming", "EldenRing")
 	os.MkdirAll(erSaveDir, 0755)
 	os.WriteFile(filepath.Join(erSaveDir, "ER0000.sl2"), []byte("elden_ring_save_bytes"), 0644)
 
-	// 2. Setup mock EmuDeck Cemu saves
+	// Setup mock EmuDeck Cemu saves
 	cemuSave := filepath.Join(tmpLinux, "Emulation", "saves", "cemu", "mlc01", "usr", "save", "00050000", "101c9500")
 	os.MkdirAll(filepath.Join(cemuSave, "user"), 0755)
 	os.WriteFile(filepath.Join(cemuSave, "user", "game_data.sav"), []byte("botw_save"), 0644)
@@ -1072,7 +1072,7 @@ func TestCustomPrefixDirectoryScan(t *testing.T) {
 }
 
 func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
-	// 1. Unreal Engine Codenames
+	// Unreal Engine Codenames
 	testCodenames := map[string]struct {
 		expectedID   string
 		expectedName string
@@ -1091,7 +1091,7 @@ func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
 		}
 	}
 
-	// 2. Title cleaning & normalization
+	// Title cleaning & normalization
 	if got := cleanGameTitle("Beyond Two Souls Steam"); got != "Beyond Two Souls" {
 		t.Errorf("Expected 'Beyond Two Souls', got '%s'", got)
 	}
@@ -1099,7 +1099,7 @@ func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
 		t.Errorf("Expected 'The Walking Dead Definitive Series', got '%s'", got)
 	}
 
-	// 3. Known AppIDs and delisted games
+	// Known AppIDs and delisted games
 	if name := getGameName("224060", ""); name != "Deadpool" {
 		t.Errorf("Expected 'Deadpool' for AppID 224060, got '%s'", name)
 	}
@@ -1107,7 +1107,7 @@ func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
 		t.Errorf("Expected 'Horizon Forbidden West Complete Edition' for AppID 2420110, got '%s'", name)
 	}
 
-	// 4. LocalLow Mock scanning
+	// LocalLow Mock scanning
 	tmpRoot, err := os.MkdirTemp("", "locallow_test_*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -1172,7 +1172,7 @@ func TestLatestTelemetryCodenamesAndEdgeCases(t *testing.T) {
 }
 
 func TestV0110EmulatorAndArtworkFeatures(t *testing.T) {
-	// 1. Unreal Engine Telemetry Codenames
+	// Unreal Engine Telemetry Codenames
 	fAppID, fName := resolveUnrealProjectCodename("FactoryGame")
 	if fAppID != "526870" || fName != "Satisfactory" {
 		t.Errorf("Expected Satisfactory (526870), got %s (%s)", fName, fAppID)
@@ -1188,7 +1188,7 @@ func TestV0110EmulatorAndArtworkFeatures(t *testing.T) {
 		t.Errorf("Expected Silent Hill f, got %s", shfName)
 	}
 
-	// 2. Switch title ID mappings & artwork
+	// Switch title ID mappings & artwork
 	if name := switchTitleMap["01004a4010fea000"]; name != "Bayonetta 3" {
 		t.Errorf("Expected Bayonetta 3, got '%s'", name)
 	}
@@ -1199,7 +1199,7 @@ func TestV0110EmulatorAndArtworkFeatures(t *testing.T) {
 		t.Errorf("Expected valid art URL for Smash Bros, got '%s'", art)
 	}
 
-	// 3. Local console save icon extraction (icon0.png)
+	// Local console save icon extraction (icon0.png)
 	tmpDir, err := os.MkdirTemp("", "save_art_test_*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -1216,7 +1216,7 @@ func TestV0110EmulatorAndArtworkFeatures(t *testing.T) {
 		t.Errorf("Expected data URI base64 icon, got '%s'", extracted)
 	}
 
-	// 4. Xbox 360 Title Mapping
+	// Xbox 360 Title Mapping
 	if title := getXboxTitleName("545408A7"); title != "Red Dead Redemption" {
 		t.Errorf("Expected Red Dead Redemption, got '%s'", title)
 	}
@@ -1232,7 +1232,7 @@ func TestV112PublisherAndSymlinkDeduplication(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// 1. Test Unreal Project Codenames
+	// Test Unreal Project Codenames
 	palID, palName := resolveUnrealProjectCodename("Pal")
 	if palID != "1623730" || palName != "Palworld" {
 		t.Errorf("Expected Pal -> 1623730 / Palworld, got %s / %s", palID, palName)
@@ -1243,13 +1243,13 @@ func TestV112PublisherAndSymlinkDeduplication(t *testing.T) {
 		t.Errorf("Expected RogueCore -> 2605790 / Deep Rock Galactic: Rogue Core, got %s / %s", rogueID, rogueName)
 	}
 
-	// 2. Test Clean Game Title Demo Suffix Trimming
+	// Test Clean Game Title Demo Suffix Trimming
 	cleanedDemo := cleanGameTitle("OnimushaWotS_Demo")
 	if cleanedDemo != "Onimusha: Way of the Sword" {
 		t.Errorf("Expected clean title 'Onimusha: Way of the Sword', got '%s'", cleanedDemo)
 	}
 
-	// 3. Test Publisher Subdirectories in My Games
+	// Test Publisher Subdirectories in My Games
 	docsDir := filepath.Join(tmpDir, "Documents")
 	myGamesDir := filepath.Join(docsDir, "My Games")
 
@@ -1297,7 +1297,7 @@ func TestV112PublisherAndSymlinkDeduplication(t *testing.T) {
 		t.Errorf("Expected empty/telemetry publisher folder 'Square Enix' NOT to be registered as a game")
 	}
 
-	// 4. Test Symlink Canonical Path Deduplication
+	// Test Symlink Canonical Path Deduplication
 	realDir := filepath.Join(tmpDir, "real_save_folder")
 	os.MkdirAll(realDir, 0755)
 	symlinkDir := filepath.Join(tmpDir, "symlink_save_folder")
@@ -1370,17 +1370,17 @@ func TestXeniaFalsePositiveRejectionAndDetection(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpGamesDir)
 
-	// 1. Simulate Witcher 3 content folder structure (should be completely ignored)
+	// Simulate Witcher 3 content folder structure (should be completely ignored)
 	witcherBundles := filepath.Join(tmpGamesDir, "The Witcher 3 - Wild Hunt", "content", "content0", "bundles")
 	os.MkdirAll(witcherBundles, 0755)
 	os.WriteFile(filepath.Join(witcherBundles, "blob0.bundle"), []byte("DUMMY_GAME_ASSET"), 0644)
 
-	// 2. Simulate Roblox content folder structure (should be completely ignored)
+	// Simulate Roblox content folder structure (should be completely ignored)
 	robloxLua := filepath.Join(tmpGamesDir, "Roblox", "content", "ExtraContent", "LuaPackages")
 	os.MkdirAll(robloxLua, 0755)
 	os.WriteFile(filepath.Join(robloxLua, "package.lua"), []byte("DUMMY_ROBLOX_SCRIPT"), 0644)
 
-	// 3. Simulate real portable Xenia installation with 16-hex profile and 8-hex title ID
+	// Simulate real portable Xenia installation with 16-hex profile and 8-hex title ID
 	xeniaDir := filepath.Join(tmpGamesDir, "XeniaPortable")
 	xeniaSave := filepath.Join(xeniaDir, "content", "0000000000000000", "5841088f", "00000001")
 	os.MkdirAll(xeniaSave, 0755)
@@ -1542,7 +1542,7 @@ func TestScan1911AndLiesOfP(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// 1. Test .1911 profile scanner
+	// Test .1911 profile scanner
 	base1911 := filepath.Join(tmpDir, ".1911")
 	rdr2Prof := filepath.Join(base1911, "Red Dead Redemption 2", "profile")
 	if err := os.MkdirAll(rdr2Prof, 0755); err != nil {
@@ -1572,7 +1572,7 @@ func TestScan1911AndLiesOfP(t *testing.T) {
 		t.Errorf("Expected 2 files, got %d", g.FileCount)
 	}
 
-	// 2. Test Lies of P in-tree detection
+	// Test Lies of P in-tree detection
 	gamesRoot := filepath.Join(tmpDir, "Games")
 	liesOfPDir := filepath.Join(gamesRoot, "Lies of P", "LiesofP", "Saved", "SaveGames")
 	if err := os.MkdirAll(liesOfPDir, 0755); err != nil {

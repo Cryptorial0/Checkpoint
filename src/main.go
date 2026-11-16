@@ -695,21 +695,17 @@ func launchAppWindow(url string) {
 			}
 		}
 
-		// 1. Edge (Pre-installed on virtually all Windows 10 & 11)
 		addCandidate(progFiles86, `Microsoft\Edge\Application\msedge.exe`)
 		addCandidate(progFiles, `Microsoft\Edge\Application\msedge.exe`)
 		addCandidate(localApp, `Microsoft\Edge\Application\msedge.exe`)
 
-		// 2. Brave (Popular on debloated Windows / gaming rigs)
 		addCandidate(localApp, `BraveSoftware\Brave-Browser\Application\brave.exe`)
 		addCandidate(progFiles, `BraveSoftware\Brave-Browser\Application\brave.exe`)
 
-		// 3. Chrome
 		addCandidate(localApp, `Google\Chrome\Application\chrome.exe`)
 		addCandidate(progFiles, `Google\Chrome\Application\chrome.exe`)
 		addCandidate(progFiles86, `Google\Chrome\Application\chrome.exe`)
 
-		// 4. Vivaldi, Opera
 		addCandidate(localApp, `Vivaldi\Application\vivaldi.exe`)
 		addCandidate(localApp, `Programs\Opera\launcher.exe`)
 
@@ -909,7 +905,6 @@ func writeScanReportFile(games []DetectedGame) (string, string) {
 	content := sb.String()
 	reportName := "save_migrator_scan_report.txt"
 
-	// 1. Primary path: executable directory or current working directory
 	var primaryPath string
 	execPath, err := os.Executable()
 	if err == nil {
@@ -920,7 +915,6 @@ func writeScanReportFile(games []DetectedGame) (string, string) {
 
 	_ = os.WriteFile(primaryPath, []byte(content), 0644)
 
-	// 2. Secondary fallback path: OS Temp directory
 	tempPath := filepath.Join(os.TempDir(), reportName)
 	_ = os.WriteFile(tempPath, []byte(content), 0644)
 

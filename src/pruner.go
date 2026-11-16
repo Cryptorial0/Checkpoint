@@ -102,7 +102,7 @@ func BuildRPGExcludedPaths(sourceDir string, gameName, targetRelPath string) (ma
 		}
 	}
 
-	// 1. Baldur's Gate 3 folder-based saves (Story/<SaveName>/<SaveName>.lsv)
+	// Baldur's Gate 3 folder-based saves
 	if strings.Contains(combined, "baldurs gate 3") || strings.Contains(combined, "larian studios") {
 		storyDir := sourceDir
 		if !strings.HasSuffix(strings.ToLower(sourceDir), "story") {
@@ -175,7 +175,7 @@ func BuildRPGExcludedPaths(sourceDir string, gameName, targetRelPath string) (ma
 		}
 	}
 
-	// 2. Cyberpunk 2077 folder-based saves (AutoSave-*, QuickSave-*, ManualSave-*)
+	// Cyberpunk 2077 folder-based saves
 	if strings.Contains(combined, "cyberpunk 2077") || strings.Contains(combined, "cd projekt red") {
 		entries, err := os.ReadDir(sourceDir)
 		if err == nil {
@@ -236,7 +236,7 @@ func BuildRPGExcludedPaths(sourceDir string, gameName, targetRelPath string) (ma
 		}
 	}
 
-	// 3. Flat file-based RPG saves (Starfield *.sfs, Skyrim *.ess, Fallout 4 *.fos)
+	// Flat file RPG saves (Starfield, Skyrim, Fallout)
 	entries, err := os.ReadDir(sourceDir)
 	if err == nil {
 		var quickSaves []SaveItem
